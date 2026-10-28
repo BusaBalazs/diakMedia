@@ -1,0 +1,71 @@
+/* ===== School pages: shared structure, per-school palette/pattern/shape via CSS variables ===== */
+.school-page { --sc-bg: #ffd23f; --sc-fg: #101426; --sc-accent: #2d3cf0; --sc-accent2: #ff8fd0; --sc-accent-fg: #fff; --sc-radius: 0px; }
+.school-hero { position: relative; background-color: var(--sc-bg); color: var(--sc-fg); padding-block: clamp(2.5rem, 6vw, 4.5rem); }
+.school-page[data-pattern='dots'] .school-hero { background-image: radial-gradient(color-mix(in srgb, var(--sc-accent2) 70%, transparent) 2.5px, transparent 3px); background-size: 24px 24px; }
+.school-page[data-pattern='grid'] .school-hero { background-image: linear-gradient(color-mix(in srgb, var(--sc-accent) 22%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--sc-accent) 22%, transparent) 1px, transparent 1px); background-size: 28px 28px; }
+.school-page[data-pattern='stripes'] .school-hero { background-image: repeating-linear-gradient(135deg, transparent 0 20px, color-mix(in srgb, var(--sc-accent2) 55%, transparent) 20px 30px); }
+.school-page[data-pattern='peaks'] .school-hero { background-image: linear-gradient(135deg, color-mix(in srgb, var(--sc-accent2) 30%, transparent) 25%, transparent 25%), linear-gradient(225deg, color-mix(in srgb, var(--sc-accent2) 30%, transparent) 25%, transparent 25%); background-size: 48px 48px; background-position: -24px 0; }
+.school-page[data-pattern='rings'] .school-hero { background-image: repeating-radial-gradient(circle at 88% 30%, transparent 0 24px, color-mix(in srgb, var(--sc-accent2) 45%, transparent) 24px 29px); }
+.school-page[data-pattern='checks'] .school-hero { background-image: conic-gradient(color-mix(in srgb, var(--sc-accent2) 55%, transparent) 25%, transparent 0 50%, color-mix(in srgb, var(--sc-accent2) 55%, transparent) 0 75%, transparent 0); background-size: 56px 56px; }
+.school-page[data-pattern='waves'] .school-hero { background-image: radial-gradient(circle at 25px 0, transparent 0 17px, color-mix(in srgb, var(--sc-accent) 40%, transparent) 18px 22px, transparent 23px); background-size: 50px 28px; }
+.school-hero__inner { display: grid; gap: 2rem; align-items: start; }
+.school-hero__main { display: flex; flex-direction: column; align-items: flex-start; gap: 0.9rem; background: var(--sc-bg); padding: 0.5rem 1rem 1rem 0; border-radius: var(--sc-radius); }
+.school-sticker { display: inline-block; font-family: var(--font-hand); text-transform: uppercase; background: var(--sc-accent); color: var(--sc-accent-fg); padding: 0.2em 0.65em 0.1em; transform: rotate(-3deg); box-shadow: 2px 3px 0 rgba(16, 20, 38, 0.25); }
+.school-hero__title { font-weight: 900; font-size: clamp(3rem, 12vw, 7.5rem); letter-spacing: -0.045em; line-height: 0.95; }
+.school-page[data-upper='yes'] .school-hero__title { text-transform: uppercase; letter-spacing: -0.03em; font-size: clamp(2.6rem, 10.5vw, 6.5rem); }
+.school-hero__school { font-weight: 600; font-size: 1.15rem; }
+.school-hero__desc { max-width: 52ch; font-size: 1.05rem; }
+.school-hero__facts { font-weight: 600; }
+.school-hero__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.9rem 1.5rem; }
+.school-hero__hint { font-size: 0.9rem; max-width: 46ch; }
+.school-btn { background: var(--sc-accent); color: var(--sc-accent-fg); border: 3px solid var(--sc-fg); border-radius: var(--sc-radius); box-shadow: 4px 4px 0 var(--sc-fg); gap: 0.5rem; font-weight: 600; }
+.school-btn:hover { transform: translate(-1px, -1px); box-shadow: 6px 6px 0 var(--sc-fg); }
+.school-btn--on { background: var(--sc-fg); color: var(--sc-bg); border-color: var(--sc-fg); box-shadow: 4px 4px 0 var(--sc-accent); }
+.school-link { font-weight: 600; text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 0.25em; }
+.school-link:hover { text-decoration-color: var(--sc-accent); }
+.school-hero :focus-visible { outline-color: var(--sc-fg); }
+.school-hero__picker { position: relative; z-index: 3; }
+@media (min-width: 56rem) { .school-hero__inner { grid-template-columns: 7fr 5fr; gap: 3rem; } .school-hero__picker { padding-top: 2.5rem; } }
+
+/* School page content takes on the school's accent */
+.school-page .card__media { border-radius: var(--sc-radius); box-shadow: 6px 6px 0 var(--sc-accent); }
+.school-page .card:hover .card__media { box-shadow: 10px 10px 0 var(--sc-accent); }
+.school-page .media { border-radius: calc(var(--sc-radius) * 0.6); }
+.school-page .card { --pop: var(--sc-accent); }
+.school-page .card__title { font-weight: 800; }
+.school-page[data-upper='yes'] .card__title { text-transform: none; }
+.school-page .card:nth-child(4n + 1) { --tilt: -1deg; } .school-page .card:nth-child(4n + 2) { --tilt: 0.8deg; } .school-page .card:nth-child(4n + 3) { --tilt: -0.5deg; } .school-page .card:nth-child(4n + 4) { --tilt: 1.1deg; }
+.school-page .card:nth-child(4n + 1), .school-page .card:nth-child(4n + 2), .school-page .card:nth-child(4n + 3), .school-page .card:nth-child(4n + 4) { --pop: var(--sc-accent); }
+.school-page .chip { border: 2px solid var(--ink); border-radius: var(--sc-radius); box-shadow: 3px 3px 0 var(--sc-accent); }
+.school-page .chip[aria-pressed='true'] { background: var(--sc-bg); color: var(--sc-fg); border-color: var(--ink); box-shadow: 1px 1px 0 var(--ink); transform: translate(2px, 2px); }
+.school-page .chip[aria-pressed='true'] .chip__count { color: var(--sc-fg); }
+.school-page .section { padding-block: clamp(2.5rem, 6vw, 4.5rem); }
+.school-feature .card--feature { gap: 1.75rem; }
+.school-page .section-header__title { max-width: 22ch; }
+.school-page .empty { border: 3px solid var(--ink); box-shadow: 6px 6px 0 var(--sc-accent); }
+.school-page .pub-badge--school { background: var(--sc-bg); color: var(--sc-fg); border-color: var(--ink); }
+
+/* ---------- Picker ---------- */
+.picker { position: relative; display: grid; gap: 0.5rem; color: var(--ink); }
+.school-hero .picker, .masthead .picker { color: inherit; }
+.picker__label { font-weight: 600; font-size: 0.95rem; }
+.picker__field { display: flex; align-items: center; gap: 0.6rem; background: var(--white); color: var(--ink); border: 3px solid var(--ink); padding: 0 0.9rem; border-radius: var(--sc-radius, 0); box-shadow: 5px 5px 0 var(--ink); }
+.picker__field:focus-within { outline: 3px solid var(--blue); outline-offset: 3px; }
+.picker__field input { flex: 1; min-width: 0; min-height: 3.2rem; border: 0; background: transparent; font-size: 1.05rem; outline: none; }
+.picker__field input::placeholder { color: var(--muted); }
+.picker__count { font-size: 0.85rem; font-weight: 600; }
+.picker__list { background: var(--white); color: var(--ink); border: 3px solid var(--ink); border-radius: var(--sc-radius, 0); max-height: 22rem; overflow: auto; box-shadow: 6px 6px 0 var(--ink); }
+.picker--dropdown .picker__list { position: absolute; top: 100%; left: 0; right: 0; z-index: 30; margin-top: 0.15rem; }
+.picker--inline .picker__list { max-height: none; }
+.picker__option { display: flex; align-items: center; gap: 0.85rem; padding: 0.8rem 1rem; cursor: pointer; border-bottom: 1px solid var(--line); }
+.picker__option:last-child { border-bottom: 0; }
+.picker__option.is-active { background: var(--lime); }
+.picker__option.is-current { box-shadow: inset 6px 0 0 var(--blue); }
+.picker__text { display: grid; gap: 0.1rem; min-width: 0; }
+.picker__name { font-weight: 600; line-height: 1.25; }
+.picker__meta { font-size: 0.85rem; color: var(--muted); }
+.picker__option.is-active .picker__meta { color: var(--ink-2); }
+.picker__mine { margin-left: auto; font-size: 0.85rem; }
+.picker__empty { padding: 1rem; color: var(--ink-2); }
+.masthead--chooser .masthead__inner { align-items: start; }
+.theme-maxi .masthead--chooser .picker__field { box-shadow: 5px 5px 0 var(--ink); }

@@ -1,0 +1,33 @@
+:root {
+  /* Palette */
+  --ink: #101426;
+  --ink-2: #394058;
+  --muted: #566078;
+  --line: #dfe2ec;
+  --line-strong: #b9bfd0;
+  --paper: #f2f4f8;
+  --white: #ffffff;
+  --blue: #2d3cf0;
+  --blue-deep: #1f2bc2;
+  --sun: #ffd23f;
+
+  --lime: #d4f23a;
+  --pink: #ff8fd0;
+  --cyan: #5fe0f0;
+  --violet: #7b4dff;
+  --orange: #ff7a3d;
+  --grad: linear-gradient(90deg, #2d3cf0 0%, #7b2fe0 55%, #d02fb0 100%);
+
+  /* Type */
+  --font-ui: 'Inter Variable', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Montserrat', 'Inter Variable', system-ui, sans-serif;
+  --font-hand: 'Permanent Marker', 'Montserrat', 'Segoe Print', cursive;
+  --font-read: var(--font-ui);
+
+  /* Layout */
+  --container: 80rem;
+  --gutter: clamp(1rem, 4vw, 2.5rem);
+  --radius: 3px;
+  --strip-h: 1.75rem;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
