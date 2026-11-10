@@ -61,7 +61,7 @@ function attentionItems(role, by, newSuggestions, openTopics) {
     if (by.changes_requested) list.push({ n: by.changes_requested, text: 'tartalmadhoz módosítást kértek', to: '/admin/tartalmak?statusz=changes_requested', tone: 'danger' });
     if (by.draft) list.push({ n: by.draft, text: 'piszkozatod vár befejezésre', to: '/admin/tartalmak?statusz=draft', tone: 'neutral' });
   }
-  if ((role === 'teacher' || role === 'editor') && newSuggestions) list.push({ n: newSuggestions, text: 'új diákjavaslat érkezett', to: '/admin/javaslatok', tone: 'info' });
+  if (can(role, 'content.create') && newSuggestions) list.push({ n: newSuggestions, text: 'új diákjavaslat érkezett', to: '/admin/javaslatok', tone: 'info' });
   if ((role === 'teacher' || role === 'editor') && openTopics) list.push({ n: openTopics, text: 'témajavaslat vár feldolgozásra', to: '/admin/temajavaslat', tone: 'warn' });
   if (role === 'teacher' && by.changes_requested) list.push({ n: by.changes_requested, text: 'tartalom javításra vár a szerzőnél', to: '/admin/tartalmak?statusz=changes_requested', tone: 'danger' });
   return list;
@@ -141,22 +141,13 @@ function WorkflowPanel({ by }) {
   );
 }
 
-function SideCard({ role, newSuggestions }) {
-  if (can(role, 'suggestions.review')) {
-    return (
-      <section className={`${card} p-4 sm:p-5`} aria-labelledby="sugg-title">
-        <h2 id="sugg-title" className="text-sm font-semibold text-ink">Diákjavaslatok</h2>
-        <p className="mt-2 text-3xl font-bold tabular-nums tracking-tight">{newSuggestions}</p>
-        <p className="text-xs text-muted">új javaslat a szerkesztőségi postaládában</p>
-        <Link to="/admin/javaslatok" className={`${linkAction} mt-3`}>Megnyitás <Icon name="chevronRight" size={14} /></Link>
-      </section>
-    );
-  }
+function SideCard({ newSuggestions }) {
   return (
     <section className={`${card} p-4 sm:p-5`} aria-labelledby="sugg-title">
-      <h2 id="sugg-title" className="text-sm font-semibold text-ink">Van ötleted?</h2>
-      <p className="mt-1.5 text-sm text-muted">Küldj témajavaslatot, fotót vagy ajánlót a szerkesztőségnek.</p>
-      <Link to="/admin/javaslatok" className={`${linkAction} mt-3`}>Javaslat küldése <Icon name="chevronRight" size={14} /></Link>
+      <h2 id="sugg-title" className="text-sm font-semibold text-ink">Diákjavaslatok</h2>
+      <p className="mt-2 text-3xl font-bold tabular-nums tracking-tight">{newSuggestions}</p>
+      <p className="text-xs text-muted">új javaslat a szerkesztőségi postaládában</p>
+      <Link to="/admin/javaslatok" className={`${linkAction} mt-3`}>Megnyitás <Icon name="chevronRight" size={14} /></Link>
     </section>
   );
 }
@@ -176,7 +167,7 @@ export default function Dashboard() {
     const repo = await getRepository();
     const [content, newSuggestions, openTopics] = await Promise.all([
       repo.listContent({ schoolId: user.schoolId, role: user.role, uid: user.uid }),
-      can(user.role, 'suggestions.review') ? repo.countNewSuggestions({ schoolId: user.schoolId }) : 0,
+      can(user.role, 'content.create') ? repo.countNewSuggestions({ schoolId: user.schoolId }) : 0,
       can(user.role, 'content.review') ? repo.countOpenTopics({ schoolId: user.schoolId }) : 0,
     ]);
     return { content, newSuggestions, openTopics };
@@ -206,7 +197,7 @@ export default function Dashboard() {
           </div>
           <div className="grid gap-4 sm:gap-6 sm:grid-cols-2 xl:grid-cols-1">
             <WorkflowPanel by={by} />
-            <SideCard role={user.role} newSuggestions={data.newSuggestions} />
+            <SideCard newSuggestions={data.newSuggestions} />
           </div>
         </div>
       </div>

@@ -255,9 +255,9 @@ export const devRepository = {
   async countOpenTopics({ schoolId }) { await delay(80); return load().topics.filter((t) => t.schoolId === schoolId && t.status === 'open').length; },
 
   // ---- student suggestions ----
-  async listSuggestions({ schoolId, role, uid }) {
+  async listSuggestions({ schoolId }) {
     await delay(150);
-    return clone(load().suggestions.filter((x) => x.schoolId === schoolId && (role === 'author' ? x.authorId === uid : true)).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)));
+    return clone(load().suggestions.filter((x) => x.schoolId === schoolId).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)));
   },
   async createSuggestion({ category, title, text }, { user }) {
     await delay(150);

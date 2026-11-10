@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Counter, Field, TextArea, TextInput } from '../components/FormParts.jsx';
 import { EmptyState, ErrorNotice, PageHeader, Skeleton } from '../components/Parts.jsx';
 import { Dot } from '../components/StatusBadge.jsx';
 import { btnPrimary, btnSecondary, card, input } from '../components/ui.js';
@@ -39,10 +38,12 @@ function Item({ s, reviewer, onUpdate }) {
           <SpellcheckAssist value={note} />
           <div className="flex flex-wrap gap-2">
             {ACTIONS.map(([k, l]) => (<button key={k} type="button" disabled={busy} onClick={() => go(k)} aria-pressed={s.status === k} className={`${btnSecondary} !h-9 ${s.status === k ? '!border-brand !bg-brand-soft !text-brand-dark' : ''}`}>{l}</button>))}
-            <Link to={`/admin/tartalmak/uj?cim=${encodeURIComponent(s.title)}`} className={`${btnPrimary} !h-9`}>Tartalom indítása</Link>
           </div>
         </div>
       )}
+      <div className="mt-3 flex justify-end">
+        <Link to={`/admin/tartalmak/uj?cim=${encodeURIComponent(s.title)}`} className={`${btnPrimary} !h-9`}>Tartalom indítása</Link>
+      </div>
     </li>
   );
 }
@@ -51,36 +52,17 @@ export default function SuggestionsPage() {
   const { user } = useAuth();
   const reviewer = can(user.role, 'suggestions.review');
   const [filter, setFilter] = useState('all');
-  const [form, setForm] = useState({ category: 'topic_idea', title: '', text: '' });
-  const [msg, setMsg] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const { data, error, loading, reload } = useAsync(async () => (await getRepository()).listSuggestions({ schoolId: user.schoolId, role: user.role, uid: user.uid }), [user.uid, user.role]);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!form.title.trim()) { setMsg({ tone: 'danger', text: 'Adj címet a javaslatnak.' }); return; }
-    setBusy(true); setMsg(null);
-    try { await (await getRepository()).createSuggestion(form, { user }); setForm({ category: 'topic_idea', title: '', text: '' }); setMsg({ tone: 'ok', text: 'Köszönjük, a javaslat megérkezett a szerkesztőséghez.' }); await reload(); } catch (err) { setMsg({ tone: 'danger', text: err.message }); } finally { setBusy(false); }
-  };
+  const { data, error, loading, reload } = useAsync(async () => (await getRepository()).listSuggestions({ schoolId: user.schoolId }), [user.schoolId]);
   const update = async (id, patch) => { await (await getRepository()).updateSuggestion(id, patch, { user }); await reload(); };
   const list = (data || []).filter((s) => filter === 'all' || s.status === filter);
 
   return (
     <>
-      <PageHeader title="Diákjavaslatok" description={reviewer ? 'A diákok javaslatai a szerkesztőségi postaládában. A javaslat nem lesz automatikusan cikk.' : 'Küldj témaötletet, fotót vagy ajánlót a szerkesztőségnek.'} />
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] items-start">
-        <form onSubmit={submit} className={`${card} grid gap-3.5 p-4 sm:p-5`} aria-label="Új javaslat">
-          <h2 className="text-sm font-semibold">Új javaslat küldése</h2>
-          <Field label="Típus" required>{(a) => <select {...a} className={`${input} h-10`} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{Object.entries(SUGGESTION_CATEGORIES).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>}</Field>
-          <Field label="Cím" required counter={<Counter used={form.title.length} max={120} />}>{(a) => <TextInput {...a} maxLength={120} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />}</Field>
-          <Field label="Részletek" optional counter={<Counter used={form.text.length} max={500} />}>{(a) => <TextArea {...a} rows={4} maxLength={500} value={form.text} onChange={(e) => setForm({ ...form, text: e.target.value })} />}</Field>
-          <button type="submit" className={btnPrimary} disabled={busy}>Javaslat elküldése</button>
-          {msg && <p role={msg.tone === 'danger' ? 'alert' : 'status'} className={`text-sm font-medium ${msg.tone === 'danger' ? 'text-danger-ink' : 'text-ok-ink'}`}>{msg.text}</p>}
-        </form>
-
+      <PageHeader title="Diákjavaslatok" description="A nyilvános oldalon beküldött diákjavaslatok. Bármelyik szerkesztőségi tag elindíthat egy érdekes témát." />
+      <div className="grid items-start gap-6">
         <section aria-labelledby="inbox-title" className="min-w-0">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <h2 id="inbox-title" className="text-sm font-semibold">{reviewer ? 'Szerkesztőségi postaláda' : 'Korábbi javaslataid'}</h2>
+            <h2 id="inbox-title" className="text-sm font-semibold">Szerkesztőségi postaláda</h2>
             <select aria-label="Szűrés állapot szerint" className={`${input} h-9 !w-auto`} value={filter} onChange={(e) => setFilter(e.target.value)}>
               <option value="all">Minden állapot</option>{Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>

@@ -254,11 +254,9 @@ export const firestoreRepository = {
   async countOpenTopics({ schoolId }) { const { c } = await col('topics'); return (await getCountFromServer(query(c, where('schoolId', '==', schoolId), where('status', '==', 'open')))).data().count; },
 
   // ---- student suggestions ----
-  async listSuggestions({ schoolId, role, uid }) {
+  async listSuggestions({ schoolId }) {
     const { c } = await col('suggestions');
-    const cs = [where('schoolId', '==', schoolId)];
-    if (role === 'author') cs.push(where('authorId', '==', uid));
-    return (await getDocs(query(c, ...cs))).docs.map(withId).sort(byCreatedDesc);
+    return (await getDocs(query(c, where('schoolId', '==', schoolId)))).docs.map(withId).sort(byCreatedDesc);
   },
   async createSuggestion({ category, title, text }, { user }) {
     const { c } = await col('suggestions');

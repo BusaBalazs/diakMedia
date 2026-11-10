@@ -154,7 +154,7 @@ service cloud.firestore {
 
     match /suggestions/{id} {
       allow create: if inSchool(request.resource.data.schoolId) && request.resource.data.authorId == request.auth.uid && request.resource.data.status == 'new';
-      allow read: if inSchool(resource.data.schoolId) && (isReviewer() || resource.data.authorId == request.auth.uid);
+      allow read: if inSchool(resource.data.schoolId) && role() in ['teacher', 'editor', 'author'];
       allow update: if inSchool(resource.data.schoolId) && isReviewer();
     }
   }

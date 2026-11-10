@@ -16,7 +16,7 @@ export default function AdminLayout() {
   const menuBtn = useRef(null);
 
   const { data: school } = useAsync(async () => (await getRepository()).getSchool(user.schoolId), [user.schoolId]);
-  const { data: newSuggestions } = useAsync(async () => (can(user.role, 'suggestions.review') ? (await getRepository()).countNewSuggestions({ schoolId: user.schoolId }) : 0), [user.schoolId, user.role]);
+  const { data: newSuggestions } = useAsync(async () => (can(user.role, 'content.create') ? (await getRepository()).countNewSuggestions({ schoolId: user.schoolId }) : 0), [user.schoolId, user.role]);
   const counts = { newSuggestions: newSuggestions || 0 };
 
   useEffect(() => { setDrawer(false); }, [location.pathname]);
