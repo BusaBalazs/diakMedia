@@ -1,0 +1,17 @@
+/* Styles for the publication components (loaded together with the admin; the public CSS bundle is not touched). */
+.pub-card { max-width: 24rem; margin-inline: auto; }
+.pub-card--article { box-shadow: none; }
+.pub-card__note { font-size: 0.95rem; line-height: 1.5; }
+.pub-card__tag { align-self: flex-start; font-family: var(--font-hand); text-transform: uppercase; font-size: 0.95rem; }
+.quick-card--quote.pub-card { min-height: 15rem; }
+.quick-card--quote.pub-card > .media { width: 100%; max-height: 10rem; overflow: hidden; border: 2px solid currentColor; border-radius: 0.6rem; }
+.pub-card--opinion { background: var(--ink); color: var(--white); box-shadow: 6px 6px 0 var(--pink); padding-top: 1.7rem; }
+.pub-card__sticker { position: absolute; top: -0.9rem; left: 0.9rem; }
+.pub-card__opinion-title { font-family: var(--font-display); font-weight: 900; font-size: clamp(1.4rem, 3vw, 1.8rem); line-height: 1.1; letter-spacing: -0.02em; color: var(--white); }
+.pub-card__opinion-text { color: rgba(255, 255, 255, 0.9); line-height: 1.5; }
+.pub-card__author { font-family: var(--font-display); font-weight: 800; color: var(--lime); }
+.pub-card--opinion .school-tag, .pub-card--opinion .quick-card__by { color: rgba(255, 255, 255, 0.9); }
+.public-article { max-width: 54rem; margin-inline: auto; padding: 1.5rem 1.25rem 2rem; background: var(--white); }
+.public-article__hero { margin-top: 1.5rem; }
+.public-article .prose { margin-top: 2rem; }
+.public-article__sources { margin-top: 2rem; padding-top: 1rem; border-top: 2px solid var(--ink); font-size: 0.95rem; }

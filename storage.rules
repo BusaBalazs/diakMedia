@@ -1,0 +1,13 @@
+rules_version = '2';
+// Image uploads for content. Authenticated users of the app may upload images up to 5 MB, only into their own folder.
+// The Firestore profile is the source of truth for the school; the path carries schoolId/uid for easy cleanup.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /content-images/{schoolId}/{uid}/{file} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+  }
+}

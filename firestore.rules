@@ -1,0 +1,161 @@
+rules_version = '2';
+// SECURITY RULES for the DiákMédia editorial workspace (first complete version).
+// NOT YET TESTED in the Firebase emulator: run rules tests before using real data.
+// Key guarantees:
+//  - non-public content is scoped to the user's school (users/{uid}.schoolId); published content is publicly readable
+//  - authors see/edit only their own content; editors and teachers can reassign drafts
+//  - ONLY a teacher can set status 'published' (enforced here, not only in the UI)
+//  - editors/teachers can change only workflow fields of someone else's content, never the content itself
+//  - internal notes are never readable by authors
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function profile() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function role() { return profile().role; }
+    function schoolOf() { return profile().schoolId; }
+    function isTeacher() { return signedIn() && role() == 'teacher'; }
+    function isEditor() { return signedIn() && role() == 'editor'; }
+    function isReviewer() { return isTeacher() || isEditor(); }
+    function inSchool(schoolId) { return signedIn() && schoolOf() == schoolId; }
+
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || inSchool(resource.data.schoolId));
+      allow write: if false; // roles are assigned by an administrator / trusted server code only
+    }
+
+    match /schools/{schoolId} { allow read: if inSchool(schoolId); allow write: if false; }
+    match /categories/{id} { allow read: if signedIn(); allow write: if false; }
+    match /settings/{schoolId} { allow read: if inSchool(schoolId); allow write: if inSchool(schoolId) && isTeacher(); }
+
+    match /content/{id} {
+      allow read: if resource.data.status == 'published' || (inSchool(resource.data.schoolId) && (
+        isTeacher() || resource.data.authorId == request.auth.uid || isEditor()
+      ));
+
+      // Regular drafts belong to their creator; topic assignments may create one for another non-teacher member.
+      allow create: if inSchool(request.resource.data.schoolId)
+        && request.resource.data.status == 'draft'
+        && (
+          (request.resource.data.authorId == request.auth.uid && role() in ['teacher', 'editor', 'author'])
+          || (isReviewer()
+            && request.resource.data.authorId is string
+            && get(/databases/$(database)/documents/users/$(request.resource.data.authorId)).data.schoolId == request.resource.data.schoolId
+            && get(/databases/$(database)/documents/users/$(request.resource.data.authorId)).data.role in ['editor', 'author']
+            && get(/databases/$(database)/documents/users/$(request.resource.data.authorId)).data.displayName == request.resource.data.authorName
+            && request.resource.data.topicId is string
+            && get(/databases/$(database)/documents/topics/$(request.resource.data.topicId)).data.schoolId == request.resource.data.schoolId
+            && get(/databases/$(database)/documents/topics/$(request.resource.data.topicId)).data.status == 'open')
+        );
+
+      allow update: if inSchool(resource.data.schoolId)
+        && request.resource.data.schoolId == resource.data.schoolId
+        && (
+          (request.resource.data.authorId == resource.data.authorId && (
+            // Author: edit own draft / requested changes, submit or withdraw.
+            (resource.data.authorId == request.auth.uid
+              && resource.data.status in ['draft', 'changes_requested', 'submitted', 'withdrawn']
+              && request.resource.data.status in ['draft', 'submitted', 'withdrawn']
+              && (resource.data.status == 'submitted' ? request.resource.data.status == 'withdrawn'
+                : resource.data.status == 'withdrawn' ? request.resource.data.status == 'draft' : true))
+            // Editor: review steps on content in the queue; only workflow fields may change.
+            || (isEditor()
+              && resource.data.status in ['submitted', 'editorial_review', 'withdrawn']
+              && request.resource.data.status in ['editorial_review', 'changes_requested', 'awaiting_teacher', 'draft', 'withdrawn']
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'feedback', 'submittedAt', 'publishedAt']))
+            // Teacher: workflow control including the final publication approval.
+            || (isTeacher()
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'feedback', 'publishedAt', 'submittedAt']))
+          ))
+          // Reassignment is limited to existing drafts and non-teacher school members.
+          || (isReviewer()
+            && resource.data.status == 'draft'
+            && request.resource.data.status == 'draft'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['authorId', 'authorName', 'updatedAt'])
+            && get(/databases/$(database)/documents/users/$(request.resource.data.authorId)).data.schoolId == resource.data.schoolId
+            && get(/databases/$(database)/documents/users/$(request.resource.data.authorId)).data.role in ['editor', 'author']
+            && get(/databases/$(database)/documents/users/$(request.resource.data.authorId)).data.displayName == request.resource.data.authorName)
+        )
+        // Nobody but a teacher may produce a published document.
+        && (request.resource.data.status != 'published' || isTeacher());
+
+      allow delete: if false;
+    }
+
+    match /pollVotes/{voteId} {
+      function pollDoc(pollId) {
+        return get(/databases/$(database)/documents/content/$(pollId)).data;
+      }
+
+      allow read: if resource.data.pollId is string
+        && pollDoc(resource.data.pollId).status == 'published'
+        && pollDoc(resource.data.pollId).format == 'poll';
+
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['pollId', 'option', 'createdAt'])
+        && request.resource.data.pollId is string
+        && request.resource.data.option is string
+        && voteId == request.resource.data.pollId + '_' + request.auth.uid
+        && !exists(/databases/$(database)/documents/pollVotes/$(voteId))
+        && pollDoc(request.resource.data.pollId).status == 'published'
+        && pollDoc(request.resource.data.pollId).format == 'poll'
+        && pollDoc(request.resource.data.pollId).contentData.endsAt > request.time
+        && request.resource.data.option in pollDoc(request.resource.data.pollId).contentData.options
+        && request.resource.data.createdAt == request.time;
+
+      allow update, delete: if false;
+    }
+
+    // Internal editorial notes ('internal') are reviewer-only; change-request messages ('feedback') are also visible to the author.
+    match /editorialNotes/{id} {
+      allow read: if signedIn() && inSchool(resource.data.schoolId) && (isReviewer() || (resource.data.type == 'feedback'
+        && get(/databases/$(database)/documents/content/$(resource.data.contentId)).data.authorId == request.auth.uid));
+      allow create: if inSchool(request.resource.data.schoolId) && isReviewer() && request.resource.data.authorId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // Topic ideas can be submitted by any school member and managed by editors and teachers.
+    match /topics/{id} {
+      allow read: if inSchool(resource.data.schoolId);
+      allow create: if inSchool(request.resource.data.schoolId)
+        && role() in ['teacher', 'editor', 'author']
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.status == 'open';
+      allow update: if inSchool(resource.data.schoolId)
+        && request.resource.data.schoolId == resource.data.schoolId
+        && isReviewer() && (
+        // claim: only a free topic, only for yourself
+        (resource.data.status == 'open' && request.resource.data.status == 'claimed' && request.resource.data.claimedBy == request.auth.uid)
+        // assignment: create and link a draft atomically for a non-teacher school member
+        || (resource.data.status == 'open'
+          && request.resource.data.status == 'claimed'
+          && request.resource.data.claimedBy is string
+          && get(/databases/$(database)/documents/users/$(request.resource.data.claimedBy)).data.schoolId == resource.data.schoolId
+          && get(/databases/$(database)/documents/users/$(request.resource.data.claimedBy)).data.role in ['editor', 'author']
+          && get(/databases/$(database)/documents/users/$(request.resource.data.claimedBy)).data.displayName == request.resource.data.claimedByName
+          && request.resource.data.contentId is string
+          && getAfter(/databases/$(database)/documents/content/$(request.resource.data.contentId)).data.authorId == request.resource.data.claimedBy
+          && getAfter(/databases/$(database)/documents/content/$(request.resource.data.contentId)).data.topicId == id
+          && getAfter(/databases/$(database)/documents/content/$(request.resource.data.contentId)).data.status == 'draft')
+        // Keep a linked topic's assignee in sync when its draft is transferred.
+        || (resource.data.status == 'claimed'
+          && request.resource.data.status == 'claimed'
+          && request.resource.data.contentId == resource.data.contentId
+          && isReviewer()
+          && get(/databases/$(database)/documents/users/$(request.resource.data.claimedBy)).data.schoolId == resource.data.schoolId
+          && get(/databases/$(database)/documents/users/$(request.resource.data.claimedBy)).data.role in ['editor', 'author']
+          && get(/databases/$(database)/documents/users/$(request.resource.data.claimedBy)).data.displayName == request.resource.data.claimedByName
+          && getAfter(/databases/$(database)/documents/content/$(request.resource.data.contentId)).data.authorId == request.resource.data.claimedBy)
+        // release / link / publish side effects
+        || resource.data.claimedBy == request.auth.uid || isTeacher() || request.resource.data.status in ['done', 'open']
+      );
+      allow delete: if inSchool(resource.data.schoolId) && isReviewer() && (resource.data.status == 'open' || resource.data.claimedBy == request.auth.uid || isTeacher());
+    }
+
+    match /suggestions/{id} {
+      allow create: if inSchool(request.resource.data.schoolId) && request.resource.data.authorId == request.auth.uid && request.resource.data.status == 'new';
+      allow read: if inSchool(resource.data.schoolId) && (isReviewer() || resource.data.authorId == request.auth.uid);
+      allow update: if inSchool(resource.data.schoolId) && isReviewer();
+    }
+  }
+}

@@ -1,0 +1,55 @@
+/* ---------- Like and share (demo) ---------- */
+.like-btn { display: inline-flex; align-items: center; gap: 0.5rem; min-height: 2.75rem; padding: 0 1rem; background: var(--white); color: var(--ink); border: 2px solid var(--ink); font-weight: 600; box-shadow: 3px 3px 0 var(--ink); transition: transform 0.15s var(--ease), box-shadow 0.15s var(--ease), background 0.2s; }
+.like-btn:hover { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 var(--ink); }
+.like-btn.is-on { background: var(--pink); }
+.like-btn.is-on svg { animation: heart-pop 0.4s var(--ease); }
+.like-btn--compact { min-height: 2.5rem; min-width: 2.5rem; padding: 0 0.55rem; justify-content: center; border-width: 0; background: transparent; box-shadow: none; }
+.like-btn--compact:hover { transform: none; box-shadow: none; background: var(--paper); }
+.like-btn--compact.is-on { background: transparent; color: #d6246e; }
+.card__actions { position: relative; z-index: 3; margin: 0.1rem 0 0 -0.55rem; }
+.card--dark .like-btn--compact { color: var(--white); }
+.card--dark .like-btn--compact:hover { background: rgba(255, 255, 255, 0.15); }
+.card--dark .like-btn--compact.is-on { color: var(--pink); }
+@keyframes heart-pop { 0% { transform: scale(0.6); } 60% { transform: scale(1.3); } 100% { transform: scale(1); } }
+
+.share-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.75rem; margin-top: 1.5rem; }
+.share-bar__group { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.share-bar__label { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 600; margin-right: 0.25rem; }
+.share-btn { display: inline-flex; align-items: center; gap: 0.5rem; min-height: 2.75rem; padding: 0 0.9rem; background: var(--ink); color: var(--white); border: 2px solid var(--ink); font-weight: 500; transition: background 0.2s, color 0.2s, transform 0.15s; }
+.share-btn:hover { background: var(--lime); color: var(--ink); transform: translateY(-2px); }
+
+.share-modal { width: min(100% - 1.5rem, 56rem); max-height: calc(100dvh - 2rem); padding: 0; border: 3px solid var(--ink); background: var(--white); color: var(--ink); box-shadow: 10px 10px 0 var(--lime); overflow: auto; }
+.share-modal::backdrop { background: rgba(16, 20, 38, 0.72); }
+.share-modal[open] { animation: modal-in 0.3s var(--ease); }
+@keyframes modal-in { from { opacity: 0; transform: translateY(14px) scale(0.98); } to { opacity: 1; transform: none; } }
+.share-modal__inner { padding: 1.25rem; }
+.share-modal__head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.25rem; }
+.share-modal__title { font-size: clamp(1.4rem, 3vw, 2rem); font-weight: 900; letter-spacing: -0.03em; }
+.share-modal__body { display: grid; gap: 1.5rem; }
+.share-modal__side { display: grid; gap: 0.6rem; align-content: start; }
+.share-modal__label { font-weight: 600; font-size: 0.92rem; }
+.share-modal__caption, .share-modal__link input { width: 100%; padding: 0.7rem 0.8rem; border: 2px solid var(--ink); background: var(--paper); font: inherit; font-size: 0.95rem; line-height: 1.5; resize: vertical; }
+.share-modal__link { display: flex; gap: 0.5rem; }
+.share-modal__link input { min-width: 0; }
+.share-modal__demo { font-size: 0.88rem; color: var(--muted); }
+.share-modal .btn:disabled { opacity: 0.7; cursor: progress; }
+.share-modal__done { display: grid; justify-items: start; gap: 0.9rem; padding-block: 1.5rem 1rem; max-width: 36rem; }
+.share-modal__done h3 { font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 900; }
+.share-modal__check { display: grid; place-items: center; width: 4rem; height: 4rem; background: var(--lime); border: 3px solid var(--ink); animation: heart-pop 0.5s var(--ease); }
+.share-modal__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.5rem; }
+
+.post-preview { display: flex; flex-direction: column; width: 100%; max-width: 24rem; margin-inline: auto; background: var(--white); border: 3px solid var(--ink); box-shadow: 6px 6px 0 var(--pink); overflow: hidden; }
+.post-preview--facebook { max-width: 26rem; }
+.post-preview--tiktok { max-width: 15rem; }
+.post-preview__img { flex: none; border-bottom: 3px solid var(--ink); }
+.post-preview__text { display: flex; flex-direction: column; align-items: flex-start; gap: 0.6rem; flex: 1; padding: 0.9rem; min-height: 0; }
+.post-preview__title { font-family: var(--font-display); font-weight: 900; font-size: 1.2rem; line-height: 1.1; letter-spacing: -0.02em; }
+.post-preview--tiktok .post-preview__title { font-size: 1rem; }
+.post-preview__foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.4rem 0.8rem; width: 100%; margin-top: auto; }
+.post-preview__brand { display: inline-flex; align-items: center; gap: 0.3rem; font-family: var(--font-display); font-weight: 800; font-size: 0.85rem; }
+@media (min-width: 48rem) {
+  .share-modal__inner { padding: 1.75rem; }
+  .share-modal__body { grid-template-columns: minmax(0, 22rem) 1fr; gap: 2rem; }
+  .post-preview { margin-inline: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .like-btn.is-on svg, .share-modal[open], .share-modal__check { animation: none; } }
