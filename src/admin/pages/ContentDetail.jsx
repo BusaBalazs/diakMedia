@@ -14,7 +14,7 @@ import { STATUSES } from '../config/workflow.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { getRepository } from '../data/repository.js';
 import { formatDateTime } from '../lib/date.js';
-import { categoryOf, publicSchool } from '../lib/publicRefs.js';
+import { categoryForContent, publicSchool } from '../lib/publicRefs.js';
 import { useAsync } from '../lib/useAsync.js';
 import SpellcheckAssist from '../components/SpellcheckAssist.jsx';
 
@@ -124,10 +124,11 @@ export default function ContentDetailPage() {
   if (!c) return <div className={`${card} p-6 max-w-xl text-sm`}>Ez a tartalom nem található, vagy nincs jogosultságod megnyitni.</div>;
 
   const school = data.school;
-  const category = categoryOf(c.category);
+  const category = categoryForContent(c);
   const editable = canEditContent(user, c);
   const changed = cardOutOfSync(c);
   const reviewer = can(user.role, 'content.review');
+  const formatName = FORMATS[c.format]?.label;
 
   const run = async (a, note) => { const repo = await getRepository(); await repo.transition(id, a.id, { user, note }); setFlash(`Kész: ${a.label}.`); await reload(); };
   const addNote = async (text) => { await (await getRepository()).addNote(id, text, { user }); await reload(); };
@@ -152,10 +153,11 @@ export default function ContentDetailPage() {
     <>
       <PageHeader
         title={c.title}
-        description={`${FORMATS[c.format].label}, ${category.name}`}
+        description={formatName === category.name ? category.name : `${formatName}, ${category.name}`}
         actions={<><Link to="/admin/tartalmak" className={btnSecondary}>Vissza a listához</Link>{editable && <><Link to={`/admin/tartalmak/${id}/szerkeszt`} className={btnSecondary}><Icon name="edit" size={16} /> Tartalom szerkesztése</Link><Link to={`/admin/tartalmak/${id}/kartya`} className={btnPrimary}>{c.cardData ? 'Kártya szerkesztése / beküldés' : 'Kártya létrehozása'}</Link></>}</>}
       />
       {flash && <div role="status" className="mb-4 flex items-start justify-between gap-3 rounded-xl border border-ok/30 bg-ok/5 px-4 py-3 text-sm font-medium text-ok-ink"><span>{flash}</span><button type="button" onClick={() => setFlash('')} className="text-xs underline">Bezár</button></div>}
+      {c.hasPendingChanges && <div role="status" className="mb-4 rounded-xl border border-warn/50 bg-warn/10 px-4 py-3 text-sm"><p className="font-semibold text-warn-ink">Nem publikált admin módosítások</p><p className="mt-0.5 text-gray-800">Ezek a változások az admin felületen látszanak. A nyilvános oldal csak a kártyaszerkesztőn végzett, megerősített mentéskor frissül.</p></div>}
       <div className="mb-5 flex flex-wrap items-center gap-x-5 gap-y-2"><StatusBadge status={c.status} /><Progress status={c.status} /></div>
       {c.status === 'changes_requested' && c.feedback && <div role="status" className="mb-5 rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm"><p className="font-semibold text-danger-ink">Módosítást kértek</p><p className="mt-0.5 whitespace-pre-line">{c.feedback}</p></div>}
       {changed && reviewer && <div role="alert" className="mb-5 rounded-xl border border-warn/50 bg-warn/10 px-4 py-3 text-sm"><p className="font-semibold text-warn-ink">A kártya frissítésre szorulhat</p><p className="mt-0.5">A cikk {changed.join(' és ')} megváltozott a kártya utolsó egyeztetése óta. A kártya szövegét nem írtuk felül.</p></div>}

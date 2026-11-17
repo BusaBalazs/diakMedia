@@ -1,6 +1,6 @@
 // Content rules shared by the editor, the card editor and the data layer:
 // field limits, character counting, validation and the content <-> card relationship.
-import { FORMATS } from './formats.js';
+import { FORMAT_CATEGORY_IDS, FORMATS } from './formats.js';
 
 // Field-specific limits (kept separate from the per-format TOTAL limit, which is configurable in the settings).
 export const FIELD_LIMITS = {
@@ -26,11 +26,11 @@ export const limitFor = (format, limits) => limits?.[format] ?? FORMATS[format].
 
 export function emptyContentData(format) {
   switch (format) {
-    case 'short_article': return { intro: '', body: '', sources: '', imageUrl: '', imageAlt: '' };
-    case 'poll': return { intro: '', body: '', sources: '', imageUrl: '', imageAlt: '', question: '', options: ['', ''], endsAt: '' };
-    case 'one_thought': return { quote: '', explanation: '', isOwn: true, quoteSource: '', imageUrl: '' };
-    case 'visual_story': return { intro: '', images: [], closing: '' };
-    case 'opinion': return { intro: '', body: '', sources: '', authorDisplayName: '' };
+    case 'short_article': return { intro: '', body: '', sources: '', imageUrl: '', imageAlt: '', tags: '' };
+    case 'poll': return { intro: '', body: '', sources: '', imageUrl: '', imageAlt: '', question: '', options: ['', ''], endsAt: '', tags: '' };
+    case 'one_thought': return { quote: '', explanation: '', isOwn: true, quoteSource: '', imageUrl: '', tags: '' };
+    case 'visual_story': return { intro: '', images: [], closing: '', tags: '' };
+    case 'opinion': return { intro: '', body: '', sources: '', authorDisplayName: '', tags: '' };
     default: return {};
   }
 }
@@ -44,6 +44,15 @@ export function deriveTitle(format, title, d = {}) {
 }
 
 export const featuredImage = (format, d = {}) => (format === 'visual_story' ? d.images?.[0]?.url || '' : d.imageUrl || '');
+export function syncCardImage(cardData, format, contentData) {
+  const imageUrl = featuredImage(format, contentData);
+  return {
+    ...cardData,
+    imageUrl,
+    ...(cardData.snapshot ? { snapshot: { ...cardData.snapshot, imageUrl } } : {}),
+  };
+}
+
 export const subtitleOf = (format, d = {}) => (format === 'one_thought' ? d.explanation || '' : d.intro || '');
 const cardDescriptionFromContent = (content) => {
   const d = content.contentData || {};
@@ -55,7 +64,11 @@ export function validateContent({ format, category, title, contentData: d }, lim
   const e = {};
   const need = (cond, key, msg) => { if (!soft && cond) e[key] = msg; };
   const over = (value, max, key) => { if (len(value) > max) e[key] = `Legfeljebb ${max} karakter lehet.`; };
-  need(!category, 'category', 'Válassz kategóriát.');
+  const fixedCategory = FORMATS[format].fixedCategory;
+  if (!fixedCategory) {
+    need(!category, 'category', 'Válassz kategóriát.');
+    if (FORMAT_CATEGORY_IDS.includes(category)) e.category = 'Ez a kategória csak a hozzá tartozó formátumhoz használható.';
+  }
   if (format !== 'one_thought') { need(!len(title), 'title', 'A cím kötelező.'); over(title, FIELD_LIMITS.title, 'title'); }
   if (format === 'short_article' || format === 'poll') {
     need(!len(d.intro), 'intro', 'A bevezető kötelező.'); over(d.intro, FIELD_LIMITS.intro, 'intro');
@@ -86,7 +99,6 @@ export function validateContent({ format, category, title, contentData: d }, lim
   if (format === 'opinion') {
     need(!len(d.body), 'body', 'A véleményed kifejtése kötelező.'); over(d.intro, FIELD_LIMITS.intro, 'intro');
     need(!len(d.authorDisplayName), 'authorDisplayName', 'Add meg a neved vagy a választott megjelenési neved.');
-    if (category && category !== 'velemeny') e.category = 'A vélemény mindig a Vélemény rovatba kerül.';
   }
   over(d.sources, FIELD_LIMITS.sources, 'sources');
   if (usedChars(format, d) > limitFor(format, limits)) e.total = `Túllépted a ${limitFor(format, limits)} karakteres korlátot.`;

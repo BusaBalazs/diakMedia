@@ -5,6 +5,7 @@ import { Icon } from '../components/Icons.jsx';
 import { EmptyState, ErrorNotice, PageHeader, Skeleton } from '../components/Parts.jsx';
 import { btnPrimary, btnSecondary, input } from '../components/ui.js';
 import { categories, categoryById } from '../../data/categories.js';
+import { FORMAT_CATEGORY_IDS } from '../config/formats.js';
 import { can } from '../config/roles.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { getRepository } from '../data/repository.js';
@@ -120,7 +121,7 @@ export default function TopicsPage() {
           <p className="text-lg text-ink" style={hand}>Mi legyen a téma?</p>
           <Field label="Ötlet" required counter={<Counter used={title.length} max={140} />}>{(a) => <TextInput {...a} maxLength={140} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Pl. Hogyan tanuljunk a vizsgaidőszakban?" />}</Field>
           <Field label="Rövid megjegyzés" optional counter={<Counter used={note.length} max={300} />}>{(a) => <TextArea {...a} rows={2} maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} />}</Field>
-          <Field label="Kategória" optional>{(a) => <select {...a} className={`${input} h-10`} value={category} onChange={(e) => setCategory(e.target.value)}><option value="">Még nem tudom</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>}</Field>
+          <Field label="Kategória" optional>{(a) => <select {...a} className={`${input} h-10`} value={category} onChange={(e) => setCategory(e.target.value)}><option value="">Még nem tudom</option>{categories.filter((c) => !FORMAT_CATEGORY_IDS.includes(c.id)).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>}</Field>
           <div className="flex flex-wrap items-center gap-3"><button type="submit" className={btnPrimary} disabled={busy}><Icon name="plus" size={16} /> Felírom</button>{msg && <p role={msg.tone === 'danger' ? 'alert' : 'status'} className={`text-sm font-medium ${msg.tone === 'danger' ? 'text-danger-ink' : 'text-ok-ink'}`}>{msg.text}</p>}</div>
         </form>
 

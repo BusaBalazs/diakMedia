@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import ArticleImage from "../ArticleImage.jsx";
 import { CategoryLabel, SchoolTag } from "../Tags.jsx";
 import { formatDate } from "../../lib/content.js";
@@ -15,6 +16,7 @@ const day = (v) => {
 // The homepage card of one publication, rendered with the public site's own styles.
 // One template per content format. `card` = { format, title, description, imageUrl, quoteSource, authorName, authorDisplayName, imageCount, date }.
 // Used by the admin card editor / review preview and ready to be used by the public homepage.
+//----------------------------------------------------------------------
 export default function PublicationCard({
   card,
   category,
@@ -26,9 +28,20 @@ export default function PublicationCard({
   const date = c.date ? formatDate(day(c.date)) : "";
   const tone = { "--q-bg": category.tile.bg, "--q-fg": category.tile.fg };
 
+  //----------------------------------------------------------------------
   if (c.format === "poll") {
+    //----------------------------------------------------------------------
     return (
-      <article className="card card--standard card--light pub-card pub-card--article">
+      <article
+        className={`card card--standard card--light pub-card pub-card--article${interactivePoll && c.contentId ? " pub-card--linked-poll" : ""}`}
+      >
+        {interactivePoll && c.contentId && (
+          <Link
+            to={`/tartalom/${c.contentId}`}
+            className="pub-card__poll-link"
+            aria-label={`Olvasd el a teljes bejegyzést: ${c.title}`}
+          />
+        )}
         {c.imageUrl && (
           <div className="card__media">
             <ArticleImage
@@ -108,7 +121,8 @@ export default function PublicationCard({
             decorative
           />
           <span className="sticker sticker--pink story-stack__sticker">
-            Képes történet{c.imageCount ? `, ${c.imageCount} kép` : ""}
+            {category.name}
+            {c.imageCount ? `, ${c.imageCount} kép` : ""}
           </span>
         </div>
         <p className="quick-card__cat">{category.name}</p>
@@ -131,7 +145,7 @@ export default function PublicationCard({
     return (
       <article className="quick-card pub-card pub-card--opinion">
         <span className="sticker sticker--pink pub-card__sticker">
-          Vélemény
+          {category.name}
         </span>
         <h3 className="pub-card__opinion-title">{c.title}</h3>
         {c.description && (

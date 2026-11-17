@@ -3,7 +3,7 @@ import { Icon } from '../components/Icons.jsx';
 import { Avatar, EmptyState, ErrorNotice, PageHeader, Skeleton } from '../components/Parts.jsx';
 import StatusBadge, { Dot } from '../components/StatusBadge.jsx';
 import { btnPrimary, card, linkAction } from '../components/ui.js';
-import { categoryById } from '../../data/categories.js';
+import { categoryForContent } from '../lib/publicRefs.js';
 import { FORMATS } from '../config/formats.js';
 import { ROLES, can } from '../config/roles.js';
 import { STATUSES, WORKFLOW_ORDER } from '../config/workflow.js';
@@ -104,7 +104,7 @@ function RecentList({ items }) {
               <Link to={`/admin/tartalmak/${c.id}`} className="grid gap-x-4 gap-y-1.5 px-4 sm:px-5 py-3.5 hover:bg-canvas transition-colors md:grid-cols-[minmax(0,1fr)_8rem_12.5rem] md:items-center">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-ink leading-snug">{c.title}</p>
-                  <p className="mt-0.5 text-xs text-muted">{FORMATS[c.format]?.label}<span className="mx-1.5 text-line">|</span>{categoryById[c.category]?.name}</p>
+                  <p className="mt-0.5 text-xs text-muted">{FORMATS[c.format]?.label === categoryForContent(c).name ? FORMATS[c.format]?.label : <>{FORMATS[c.format]?.label}<span className="mx-1.5 text-line">|</span>{categoryForContent(c).name}</>}</p>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-muted min-w-0 md:flex-col md:items-start md:gap-0.5">
                   <span className="inline-flex items-center gap-1.5 text-gray-700 font-medium min-w-0"><Avatar name={c.authorName} size="sm" /><span className="truncate">{c.authorName}</span></span>

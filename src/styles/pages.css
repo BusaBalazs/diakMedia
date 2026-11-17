@@ -537,7 +537,12 @@
   font-family: var(--font-ui);
   font-size: 1.1rem;
   line-height: 1.75;
-  color: #1b2033;
+  color: var(--ink);
+}
+.public-site[data-theme="dark"] .article a,
+.public-site[data-theme="dark"] .article .school-tag,
+.public-site[data-theme="dark"] .article .text-link--btn {
+  color: var(--ink);
 }
 @media (min-width: 56rem) {
   .prose {

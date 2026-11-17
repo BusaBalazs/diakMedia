@@ -34,6 +34,8 @@ export function assertAllowed(user, content, actionId) {
   return a;
 }
 
-// The author can edit their own content while it is a draft or while changes are requested.
-export const canEditContent = (user, content) => content.authorId === user.uid && ['draft', 'changes_requested'].includes(content.status);
+// Authors edit their drafts; reviewers can correct published content without taking it offline.
+export const canEditContent = (user, content) =>
+  (content.authorId === user.uid && ['draft', 'changes_requested'].includes(content.status))
+  || (REVIEWER.includes(user.role) && content.status === 'published');
 export const canSubmitContent = canEditContent;

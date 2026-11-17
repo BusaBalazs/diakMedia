@@ -12,7 +12,7 @@ import { canEditContent } from '../config/transitions.js';
 import { can } from '../config/roles.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { getRepository } from '../data/repository.js';
-import { categoryOf, publicSchool } from '../lib/publicRefs.js';
+import { categoryForContent, publicSchool } from '../lib/publicRefs.js';
 import { useAsync } from '../lib/useAsync.js';
 
 export function cardModel(content, card) {
@@ -28,7 +28,7 @@ export function cardModel(content, card) {
 
 // Frame for the live preview: desktop (card in a homepage row) or a 360 px phone.
 export function CardPreview({ content, cardData, school, device }) {
-  const category = categoryOf(content.category);
+  const category = categoryForContent(content);
   const pub = <PublicationCard card={cardModel(content, cardData)} category={category} school={publicSchool(content.schoolId, school)} />;
   const ghost = <div className="hidden sm:block rounded-xl border border-dashed border-line bg-canvas/60 min-h-[14rem]" aria-hidden="true" />;
   return (
@@ -46,12 +46,15 @@ function CardForm({ content, school }) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
   const [showErrors, setShowErrors] = useState(false);
+  const [confirmingPublish, setConfirmingPublish] = useState(false);
+  const editingPublished = content.status === 'published';
 
   const model = { ...content, cardData: card0 };
   const cardCheck = validateCard(model);
   const contentCheck = validateContent(content, null);
   const changed = cardOutOfSync(model);
   const featured = featuredImage(content.format, content.contentData);
+  const category = categoryForContent(content);
   const set = (patch) => { setNotice((n) => (n?.tone === 'danger' ? null : n)); setCard((c) => ({ ...c, ...patch })); };
 
   const save = async (next = card0) => (await getRepository()).saveCard(content.id, next, { user });
@@ -60,7 +63,19 @@ function CardForm({ content, school }) {
     try { await fn(); if (okText) setNotice({ tone: 'ok', text: okText }); } catch (e) { setNotice({ tone: 'danger', text: e.message }); } finally { setBusy(false); }
   };
 
-  const refresh = () => { const next = { ...card0, ...initialCard(content) }; setCard(next); return run(() => save(next), 'A kártya frissítve a cikk adataival.'); };
+  const refresh = () => {
+    const source = initialCard(content);
+    const snapshot = card0.snapshot || {};
+    const next = {
+      ...card0,
+      title: snapshot.title !== undefined && card0.title === snapshot.title ? source.title : card0.title,
+      description: snapshot.description !== undefined && card0.description === snapshot.description ? source.description : card0.description,
+      imageUrl: source.imageUrl,
+      snapshot: source.snapshot,
+    };
+    setCard(next);
+    return run(() => save(next), 'A kártya egyeztetve; a saját szövegeid megmaradtak.');
+  };
   const keep = () => { const next = { ...card0, snapshot: initialCard(content).snapshot }; setCard(next); return run(() => save(next), 'Rendben, a kártya változatlan marad.'); };
   const submit = () => {
     setShowErrors(true);
@@ -72,6 +87,21 @@ function CardForm({ content, school }) {
     if (!validatePublication({ ...content, cardData: card0 }, null).ok) { setNotice({ tone: 'danger', text: 'A publikáláshoz a tartalomnak és a kártyának is hiánytalannak kell lennie.' }); return; }
     run(async () => { await save(); await (await getRepository()).publishContent(content.id, { user }); nav(`/admin/tartalmak/${content.id}`, { state: { flash: 'A tartalom közvetlenül közzétéve.' } }); });
   };
+  const savePublished = () => {
+    setShowErrors(true);
+    if (!validatePublication({ ...content, cardData: card0 }, null).ok) {
+      setNotice({ tone: 'danger', text: 'A tartalom vagy a kártya hiányos, ezért nem menthető nyilvánosan.' });
+      return;
+    }
+    setConfirmingPublish(true);
+  };
+  const confirmPublishedSave = () => {
+    setConfirmingPublish(false);
+    run(async () => {
+      await (await getRepository()).savePublishedChanges(content.id, card0, { user });
+      nav(`/admin/tartalmak/${content.id}`, { state: { flash: 'A módosítások megjelentek a nyilvános oldalon.' } });
+    });
+  };
 
   const e = showErrors ? cardCheck.errors : {};
   const checklist = [
@@ -82,12 +112,12 @@ function CardForm({ content, school }) {
 
   return (
     <>
-      <PageHeader title="Főoldali kártya" description="A cím és a bevezető automatikusan átkerült a tartalomból; a kártya szövegeit itt még módosíthatod." actions={<Steps current={1} />} />
+      <PageHeader title="Főoldali kártya" description={editingPublished ? 'A módosítások admin piszkozatként menthetők; a nyilvános oldalon csak a külön megerősített mentés jeleníti meg őket.' : 'A cím és a bevezető automatikusan átkerült a tartalomból; a kártya szövegeit itt még módosíthatod.'} actions={<Steps current={1} publishedEditing={editingPublished} />} />
       {changed && (
         <div role="alert" className="mb-4 rounded-xl border border-warn/50 bg-warn/10 px-4 py-3 text-sm">
           <p className="font-semibold text-warn-ink">A cikk {changed.join(' és ')} megváltozott a kártya létrehozása óta.</p>
-          <p className="mt-0.5 text-gray-800">A kártyát nem írjuk felül magától. Döntsd el, mi legyen.</p>
-          <div className="mt-2 flex flex-wrap gap-2"><button type="button" className={btnSecondary} onClick={refresh} disabled={busy}>Kártya frissítése a cikkből</button><button type="button" className={btnSecondary} onClick={keep} disabled={busy}>A kártya marad így</button></div>
+          <p className="mt-0.5 text-gray-800">A kiemelt kép mentéskor automatikusan frissül. Az egyeztetés nem írja felül a kézzel módosított kártyaszövegeket.</p>
+          <div className="mt-2 flex flex-wrap gap-2"><button type="button" className={btnSecondary} onClick={refresh} disabled={busy}>Eltérés egyeztetése</button><button type="button" className={btnSecondary} onClick={keep} disabled={busy}>A kártya marad így</button></div>
         </div>
       )}
       {content.feedback && content.status === 'changes_requested' && <div role="status" className="mb-4 rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm"><p className="font-semibold text-danger-ink">A szerkesztőség módosítást kért</p><p className="mt-0.5">{content.feedback}</p></div>}
@@ -102,7 +132,7 @@ function CardForm({ content, school }) {
             <Field label="Kártya leírása" required error={e.description} hint="A cikk bevezetője automatikusan bekerül, és szabadon átírhatod." counter={<Counter used={(card0.description || '').length} max={FIELD_LIMITS.cardDescription} />}>
               {(a) => <TextArea {...a} rows={4} value={card0.description || ''} onChange={(ev) => set({ description: ev.target.value })} error={e.description} />}
             </Field>
-            <div className="text-sm"><p className="font-medium">Kategória és formátum</p><p className="text-muted">{categoryOf(content.category).name}, {FORMATS[content.format].label} (a cikkből átvéve)</p></div>
+            <div className="text-sm"><p className="font-medium">Kategória és formátum</p><p className="text-muted">{category.name === FORMATS[content.format].label ? category.name : `${category.name}, ${FORMATS[content.format].label}`} (a tartalomból átvéve)</p></div>
             <div className="text-sm"><p className="font-medium">Kiemelt kép</p><p className="text-muted">{featured ? 'A cikk képe, a kártyán megjelenik.' : 'Nincs kép, a kártya a kategória színével jelenik meg.'}</p></div>
           </div>
           <div className={`${card} p-4 sm:p-5`}>
@@ -125,17 +155,39 @@ function CardForm({ content, school }) {
 
       <div className="sticky bottom-0 z-20 -mx-3 sm:-mx-6 lg:-mx-8 mt-6 border-t border-line bg-surface/95 backdrop-blur px-3 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center gap-2">
         <Link to={`/admin/tartalmak/${content.id}/szerkeszt`} className={btnSecondary}>Vissza a tartalomhoz</Link>
-        <button type="button" className={btnSecondary} onClick={() => { setShowErrors(true); run(() => save(), 'Kártya mentve.'); }} disabled={busy}>Kártya mentése</button>
+        {editingPublished ? (
+          <>
+            <button type="button" className={btnSecondary} onClick={() => { setShowErrors(true); run(() => save(), 'A kártyamódosítások admin piszkozatként mentve; a nyilvános oldal nem változott.'); }} disabled={busy}>Mentés admin piszkozatként</button>
+            <span className="flex-1" />
+            <button type="button" className={`${btnPrimary} !bg-lime !text-ink hover:!bg-lime/80`} onClick={savePublished} disabled={busy}>Nyilvános módosítások mentése</button>
+          </>
+        ) : (
+          <button type="button" className={btnSecondary} onClick={() => { setShowErrors(true); run(() => save(), 'Kártya mentve.'); }} disabled={busy}>Kártya mentése</button>
+        )}
         <span className="flex-1" />
-        {can(user.role, 'content.publish') && (
+        {!editingPublished && can(user.role, 'content.publish') && (
           <button type="button" className={btnPrimary} onClick={publish} disabled={busy}>
             {busy ? 'Publikálás…' : 'Publikálás most'}
           </button>
         )}
-        <button type="button" className={can(user.role, 'content.publish') ? btnSecondary : btnPrimary} onClick={submit} disabled={busy}>
-          {busy ? 'Beküldés…' : 'Beküldés szerkesztői lektorálásra'}
-        </button>
+        {!editingPublished && (
+          <button type="button" className={can(user.role, 'content.publish') ? btnSecondary : btnPrimary} onClick={submit} disabled={busy}>
+            {busy ? 'Beküldés…' : 'Beküldés szerkesztői lektorálásra'}
+          </button>
+        )}
       </div>
+      {confirmingPublish && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-ink/60 p-4">
+          <section role="dialog" aria-modal="true" aria-labelledby="publish-confirm-title" className={`${card} w-full max-w-md p-5 shadow-pop`}>
+            <h2 id="publish-confirm-title" className="text-lg font-semibold">Nyilvános módosítások mentése?</h2>
+            <p className="mt-2 text-sm text-muted">A tartalom és a kártya frissülni fog a nyilvános oldalon. Biztosan közzéteszed a változásokat?</p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" className={btnSecondary} onClick={() => setConfirmingPublish(false)} disabled={busy}>Mégse</button>
+              <button type="button" className={`${btnPrimary} !bg-lime !text-ink hover:!bg-lime/80`} onClick={confirmPublishedSave} disabled={busy}>{busy ? 'Mentés…' : 'Megerősít'}</button>
+            </div>
+          </section>
+        </div>
+      )}
     </>
   );
 }

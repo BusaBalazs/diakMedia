@@ -1,10 +1,10 @@
-import { articles } from '../data/articles.js';
 import { categories, categoryById } from '../data/categories.js';
 import { DEMO_SCHOOL_ID, schoolById } from '../data/schools.js';
 import { authorById } from '../data/authors.js';
 import { summaries, quotes, stories } from '../data/quick.js';
 
 export const isPublished = (article) => article.visibility.school;
+const articles = [];
 
 const byDateDesc = (a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
 
@@ -53,6 +53,10 @@ export function enrich(article) {
 
 export function normalize(text) {
   return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+export function slugify(text = '') {
+  return normalize(text).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
 export function searchArticles(query) {

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { isFirebaseConfigured, getFirebase } from '../firebase/client.js';
+import { isDemoMode, isFirebaseConfigured, getFirebase } from '../firebase/client.js';
 import { initials } from '../lib/date.js';
 
 // Auth state for the admin.
@@ -8,6 +8,7 @@ import { initials } from '../lib/date.js';
 // status: loading | ready | signedOut | noProfile
 const AuthContext = createContext(null);
 const DEV_KEY = 'diakmedia.admin.devUser';
+const useFirebase = !isDemoMode && (import.meta.env.PROD || isFirebaseConfigured);
 
 function useDevAuth() {
   const [devUsers, setDevUsers] = useState([]);
@@ -50,8 +51,8 @@ function useFirebaseAuth() {
 
 export function AuthProvider({ children }) {
   // The mode never changes at runtime, so choosing the hook once per module load is safe.
-  const dev = isFirebaseConfigured ? null : useDevAuth(); // eslint-disable-line react-hooks/rules-of-hooks
-  const fb = isFirebaseConfigured ? useFirebaseAuth() : null; // eslint-disable-line react-hooks/rules-of-hooks
+  const dev = useFirebase ? null : useDevAuth(); // eslint-disable-line react-hooks/rules-of-hooks
+  const fb = useFirebase ? useFirebaseAuth() : null; // eslint-disable-line react-hooks/rules-of-hooks
   const base = dev || fb;
 
   const signIn = useCallback(async (email, password) => {
@@ -69,14 +70,14 @@ export function AuthProvider({ children }) {
     const p = base.profile;
     const user = p && base.status === 'ready' ? { ...p, initials: initials(p.displayName) } : null;
     return {
-      mode: isFirebaseConfigured ? 'firebase' : 'dev',
+      mode: useFirebase ? 'firebase' : 'dev',
       status: base.status,
       user,
       authUser: p,
       devUsers: dev?.devUsers || [],
       switchDevUser: dev?.switchDevUser,
-      signIn: isFirebaseConfigured ? signIn : undefined,
-      signOut: isFirebaseConfigured ? signOut : undefined,
+      signIn: useFirebase ? signIn : undefined,
+      signOut: useFirebase ? signOut : undefined,
     };
   }, [base, dev, signIn, signOut]);
 

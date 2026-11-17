@@ -5,15 +5,17 @@ import { Breadcrumb } from "../components/Parts.jsx";
 import { useDocumentTitle } from "../lib/hooks.js";
 import { DEMO_SCHOOL_ID } from "../data/schools.js";
 import { getRepository } from "../admin/data/repository.js";
-import { categoryOf, publicSchool } from "../admin/lib/publicRefs.js";
+import { categoryForContent, publicSchool } from "../admin/lib/publicRefs.js";
 import NotFound from "./NotFound.jsx";
 
+//--------------------------------------------------------------
 export default function PublicContentPage() {
   const { id } = useParams();
   const [content, setContent] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
+  //--------------------------------------------------------------
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -49,19 +51,22 @@ export default function PublicContentPage() {
       </p>
     );
   if (!content || content.schoolId !== DEMO_SCHOOL_ID) return <NotFound />;
+  const category = categoryForContent(content);
 
+  //--------------------------------------------------------------
   return (
     <div className="theme-maxi-lite container section">
       <Breadcrumb
         items={[
           { label: "Kezdőlap", to: "/" },
           { label: "Szikra", to: "/" },
+          { label: category.name, to: `/kategoria/${category.id}` },
           { label: "Cikk" },
         ]}
       />
       <PublicArticle
         content={content}
-        category={categoryOf(content.category)}
+        category={category}
         school={publicSchool(content.schoolId, null)}
         date={content.publishedAt || content.submittedAt || content.createdAt}
       />

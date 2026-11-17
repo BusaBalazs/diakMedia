@@ -3,6 +3,7 @@ import { Icon } from './Icons.jsx';
 import { btnSecondary, input as inputCls, inputError } from './ui.js';
 import { categories } from '../../data/categories.js';
 import { FIELD_LIMITS, MAX_STORY_IMAGES } from '../config/content.js';
+import { FORMAT_CATEGORY_IDS } from '../config/formats.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { getRepository } from '../data/repository.js';
 import { prepareImage } from '../lib/image.js';
@@ -43,13 +44,13 @@ export const TextArea = ({ error, rows = 4, ...p }) => (
   </>
 );
 
-export function CategorySelect({ value, onChange, locked, error }) {
+export function CategorySelect({ value, onChange, error }) {
   return (
-    <Field label="Kategória" required error={error} hint={locked ? 'A vélemény mindig a Vélemény rovatba kerül, ez nem módosítható.' : 'A témakör, amelyben a tartalom megjelenik.'}>
+    <Field label="Kategória" required error={error} hint="A témakör, amelyben a rövid cikk megjelenik.">
       {(a) => (
-        <select {...a} className={`${inputCls} h-10 ${error ? inputError : ''} disabled:bg-canvas disabled:text-muted`} value={value} disabled={locked} onChange={(e) => onChange(e.target.value)}>
+        <select {...a} className={`${inputCls} h-10 ${error ? inputError : ''}`} value={value} onChange={(e) => onChange(e.target.value)}>
           <option value="">Válassz kategóriát…</option>
-          {categories.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
+          {categories.filter((c) => !FORMAT_CATEGORY_IDS.includes(c.id)).map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
         </select>
       )}
     </Field>

@@ -8,7 +8,7 @@ import Steps from '../components/Steps.jsx';
 import { btnPrimary, btnSecondary, card } from '../components/ui.js';
 import PublicArticle from '../../components/publication/PublicArticle.jsx';
 import { emptyContentData, limitFor, usedChars, validateContent, initialCard, deriveTitle } from '../config/content.js';
-import { FORMAT_LIST, FORMATS } from '../config/formats.js';
+import { FORMAT_LIST, FORMATS, isFormatCategory } from '../config/formats.js';
 import { canEditContent } from '../config/transitions.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { getRepository } from '../data/repository.js';
@@ -46,6 +46,7 @@ function EditorForm({ initial, limits, topic, school, isNew }) {
   const saved = useRef(JSON.stringify(initial.form));
   const topRef = useRef(null);
   const format = initial.format;
+  const editingPublished = initial.status === 'published';
   const max = limitFor(format, limits);
   const used = usedChars(format, form.contentData);
   const dirty = JSON.stringify(form) !== saved.current;
@@ -73,7 +74,7 @@ function EditorForm({ initial, limits, topic, school, isNew }) {
     setBusy(true); setNotice(null);
     try {
       const c = await persist(payload());
-      setNotice({ tone: 'ok', text: 'Piszkozat mentve.' });
+      setNotice({ tone: 'ok', text: editingPublished ? 'Admin piszkozat mentve. A nyilvános oldal nem változott.' : 'Piszkozat mentve.' });
       if (isNew) nav(`/admin/tartalmak/${c.id}/szerkeszt`, { replace: true });
     } catch (e) { setNotice({ tone: 'danger', text: e.message }); } finally { setBusy(false); }
   };
@@ -99,7 +100,7 @@ function EditorForm({ initial, limits, topic, school, isNew }) {
     <div className="sticky bottom-0 z-20 -mx-3 sm:-mx-6 lg:-mx-8 mt-6 border-t border-line bg-surface/95 backdrop-blur px-3 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center gap-2">
       {mode === 'edit' ? (
         <>
-          <button type="button" className={btnSecondary} onClick={saveDraft} disabled={busy}>Mentés piszkozatként</button>
+          <button type="button" className={btnSecondary} onClick={saveDraft} disabled={busy}>{editingPublished ? 'Módosítások mentése' : 'Mentés piszkozatként'}</button>
           <button type="button" className={btnSecondary} onClick={() => { setMode('preview'); topRef.current?.scrollIntoView({ block: 'start' }); }}><Icon name="eye" size={16} /> Előnézet</button>
         </>
       ) : (
@@ -114,7 +115,7 @@ function EditorForm({ initial, limits, topic, school, isNew }) {
   return (
     <>
       <div ref={topRef} />
-      <PageHeader title={isNew ? `Új tartalom: ${FORMATS[format].label}` : `Szerkesztés: ${FORMATS[format].label}`} description="Először a tartalom készül el, utána hozzá a főoldali kártya." actions={<Steps current={0} />} />
+      <PageHeader title={isNew ? `Új tartalom: ${FORMATS[format].label}` : `Szerkesztés: ${FORMATS[format].label}`} description={editingPublished ? 'A módosítások admin piszkozatként mentődnek. A nyilvános oldal csak a kártyalépésen végzett, megerősített mentéskor frissül.' : 'Először a tartalom készül el, utána hozzá a főoldali kártya.'} actions={<Steps current={0} publishedEditing={editingPublished} />} />
       {topic && <div className="mb-4 flex items-start gap-2 rounded-xl border border-lime bg-lime/30 px-4 py-3 text-sm"><Icon name="notebook" size={18} className="mt-0.5 shrink-0" /><p><strong className="font-semibold">Téma:</strong> {topic.title}{topic.note ? <span className="text-gray-700"> ({topic.note})</span> : null}</p></div>}
       {feedback && initial.status === 'changes_requested' && <div role="status" className="mb-4 rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm"><p className="font-semibold text-danger-ink">A szerkesztőség módosítást kért</p><p className="mt-0.5 text-gray-800">{feedback}</p></div>}
       {notice && (
@@ -140,7 +141,7 @@ function EditorForm({ initial, limits, topic, school, isNew }) {
           {errors.total && <p role="alert" className="text-sm text-danger-ink font-medium">{errors.total}</p>}
           <div className={`${card} p-4 text-sm text-muted grid gap-2`}>
             <p className="font-semibold text-ink">Mi következik?</p>
-            <p>A „Mentés és folytatás” piszkozatként elmenti a tartalmat, és megnyitja a kártyaszerkesztőt. A tartalom még nem kerül beküldésre.</p>
+            <p>A „Mentés és folytatás” admin piszkozatként menti a tartalmat, és megnyitja a kártyaszerkesztőt. Közzétett cikk módosításakor a nyilvános oldal még nem frissül.</p>
           </div>
         </aside>
       </div>
@@ -175,12 +176,12 @@ export default function EditorPage() {
     const c = data.existing;
     if (!c) return <div className={`${card} p-6 max-w-xl text-sm`}>A tartalom nem található, vagy nincs jogosultságod megnyitni.</div>;
     if (!canEditContent(user, c)) return <Navigate to={`/admin/tartalmak/${id}`} replace />;
-    const initial = { id: c.id, format: c.format, status: c.status, feedback: c.feedback, topicId: c.topicId, form: { title: c.format === 'one_thought' ? '' : c.title, category: c.category, contentData: { ...emptyContentData(c.format), ...c.contentData } } };
+    const initial = { id: c.id, format: c.format, status: c.status, feedback: c.feedback, topicId: c.topicId, form: { title: c.format === 'one_thought' ? '' : c.title, category: FORMATS[c.format].fixedCategory || (isFormatCategory(c.category) ? '' : c.category), contentData: { ...emptyContentData(c.format), ...c.contentData } } };
     return <EditorForm key={id} initial={initial} limits={data.settings.limits} topic={data.topic} school={data.school} isNew={false} />;
   }
 
   if (!FORMATS[format]) return <FormatChooser params={new URLSearchParams()} />;
   const prefillTitle = params.get('cim') || data.topic?.title || '';
-  const initial = { format, status: 'draft', form: { title: format === 'one_thought' ? '' : prefillTitle, category: FORMATS[format].fixedCategory || data.topic?.category || '', contentData: emptyContentData(format) } };
+  const initial = { format, status: 'draft', form: { title: format === 'one_thought' ? '' : prefillTitle, category: FORMATS[format].fixedCategory || (isFormatCategory(data.topic?.category) ? '' : data.topic?.category || ''), contentData: emptyContentData(format) } };
   return <EditorForm key={`new-${format}`} initial={initial} limits={data.settings.limits} topic={data.topic} school={data.school} isNew />;
 }

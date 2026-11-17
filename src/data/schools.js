@@ -9,7 +9,7 @@ export const schools = [
     monogram: 'JÁ',
     color: '#101426',
     publication: {
-      name: 'Szikra',
+      name: 'Jedlik',
       description: 'A Jedlik Ányos Gimnázium diáklapja: kísérletek, robotok, iskolarádió és minden, ami az iskolában szikrát vet.',
     },
   },

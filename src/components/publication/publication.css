@@ -1,6 +1,9 @@
 /* Styles for the publication components (loaded together with the admin; the public CSS bundle is not touched). */
 .pub-card { max-width: 24rem; margin-inline: auto; }
 .pub-card--article { box-shadow: none; }
+.pub-card__poll-link::after { position: absolute; z-index: 1; inset: 0; content: ""; cursor: pointer; }
+.pub-card__poll-link:focus-visible::after { outline: 3px solid var(--blue); outline-offset: 3px; }
+.pub-card--linked-poll .poll-widget { position: relative; z-index: 2; }
 .pub-card__note { font-size: 0.95rem; line-height: 1.5; }
 .pub-card__tag { align-self: flex-start; font-family: var(--font-hand); text-transform: uppercase; font-size: 0.95rem; }
 .quick-card--quote.pub-card { min-height: 15rem; }

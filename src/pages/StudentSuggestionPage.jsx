@@ -4,9 +4,12 @@ import { SectionHeader } from "../components/Parts.jsx";
 import { SUGGESTION_CATEGORIES } from "../data/suggestions.js";
 import { useDocumentTitle } from "../lib/hooks.js";
 import { usePublicAuth } from "../lib/publicAuth.jsx";
+//---------------------------------------------------------------------
 
 const INITIAL_FORM = { category: "topic_idea", title: "", text: "" };
 
+//---------------------------------------------------------------------
+//---------------------------------------------------------------------
 export default function StudentSuggestionPage() {
   const { user } = usePublicAuth();
   const [form, setForm] = useState(INITIAL_FORM);
@@ -15,6 +18,7 @@ export default function StudentSuggestionPage() {
   const simulationTimer = useRef(null);
   useDocumentTitle("Diákjavaslat");
 
+  //---------------------------------------------------------------------
   useEffect(() => () => window.clearTimeout(simulationTimer.current), []);
 
   if (!user) return <Navigate to="/belepes?cel=%2Fdiakjavaslat" replace />;
@@ -38,6 +42,7 @@ export default function StudentSuggestionPage() {
     }, 500);
   };
 
+  //---------------------------------------------------------------------
   return (
     <div className="theme-maxi suggestion-page">
       <section
@@ -138,7 +143,6 @@ export default function StudentSuggestionPage() {
               </p>
             )}
           </form>
-         
         </div>
       </section>
     </div>

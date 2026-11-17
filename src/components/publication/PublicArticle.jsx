@@ -1,6 +1,8 @@
+import { Link } from "react-router-dom";
 import ArticleImage from "../ArticleImage.jsx";
 import { CategoryLabel, SchoolTag } from "../Tags.jsx";
 import { formatDate } from "../../lib/content.js";
+import { contentTags } from "../../lib/tags.js";
 import PollWidget from "./PollWidget.jsx";
 import "./publication.css";
 
@@ -34,6 +36,7 @@ const minutes = (d) => {
 };
 
 // The full article page of one publication, built from the public article styles ("how it will look on the website").
+//------------------------------------------------------------------------------------
 export default function PublicArticle({
   content,
   category,
@@ -44,6 +47,9 @@ export default function PublicArticle({
   const d = content.contentData || {};
   const who = d.authorDisplayName || content.authorName;
   const lead = content.format === "one_thought" ? "" : d.intro;
+  const tags = contentTags(d.tags);
+  
+  //------------------------------------------------------------------------------------
   return (
     <article className="article public-article">
       <header className="article__head">
@@ -148,6 +154,20 @@ export default function PublicArticle({
           active={content.status === "published"}
           interactive={interactivePoll}
         />
+      )}
+      {tags.length > 0 && (
+        <ul className="tag-list" aria-label="Címkék">
+          {tags.map((tag) => (
+            <li key={tag}>
+              <Link
+                to={`/kereses?q=${encodeURIComponent(tag)}`}
+                className="tag"
+              >
+                {tag}
+              </Link>
+            </li>
+          ))}
+        </ul>
       )}
     </article>
   );

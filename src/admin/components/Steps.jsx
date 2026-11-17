@@ -3,10 +3,11 @@ import { Icon } from './Icons.jsx';
 const STEPS = ['Tartalom', 'Kártya', 'Beküldés'];
 
 // Two-step creation (content first, card second) followed by the submission.
-export default function Steps({ current }) {
+export default function Steps({ current, publishedEditing = false }) {
+  const steps = publishedEditing ? STEPS.slice(0, 2) : STEPS;
   return (
     <ol className="flex items-center gap-2 text-sm" aria-label="A készítés lépései">
-      {STEPS.map((s, i) => {
+      {steps.map((s, i) => {
         const state = i < current ? 'done' : i === current ? 'now' : 'todo';
         return (
           <li key={s} className="flex items-center gap-2" aria-current={state === 'now' ? 'step' : undefined}>
@@ -14,7 +15,7 @@ export default function Steps({ current }) {
               {state === 'done' ? <Icon name="check" size={14} /> : i + 1}
             </span>
             <span className={state === 'now' ? 'font-semibold text-ink' : 'text-muted'}>{s}</span>
-            {i < STEPS.length - 1 && <span className="mx-1 h-px w-5 bg-line" aria-hidden="true" />}
+            {i < steps.length - 1 && <span className="mx-1 h-px w-5 bg-line" aria-hidden="true" />}
           </li>
         );
       })}

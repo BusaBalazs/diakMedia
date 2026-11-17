@@ -26,6 +26,8 @@ export const Icons = {
   inbox: (p) => <Svg {...p}><path d="M4 13.5l2.2-7.2A2 2 0 0 1 8.1 5h7.8a2 2 0 0 1 1.9 1.3L20 13.5M4 13.5V18a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 20 18v-4.5M4 13.5h4.5l1 2.5h5l1-2.5H20" /></Svg>,
   clock: (p) => <Svg {...p}><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></Svg>,
   refresh: (p) => <Svg {...p}><path d="M20 11a8 8 0 0 0-14.3-4.4L4 8.5M4 4v4.5h4.5M4 13a8 8 0 0 0 14.3 4.4L20 15.5M20 20v-4.5h-4.5" /></Svg>,
+  chat: (p) => <Svg {...p}><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2 1-5a7.5 7.5 0 1 1 16-4.5z" /><path d="M8 11.5h.01M12 11.5h.01M16 11.5h.01" /></Svg>,
+  send: (p) => <Svg {...p}><path d="M21 3 10 14M21 3l-7 18-4-7-7-4z" /></Svg>,
 };
 
 export function Icon({ name, ...p }) {

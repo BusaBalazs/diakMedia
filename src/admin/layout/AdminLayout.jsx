@@ -6,6 +6,7 @@ import { can } from '../config/roles.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { getRepository } from '../data/repository.js';
 import { useAsync } from '../lib/useAsync.js';
+import AdminChat from '../components/AdminChat.jsx';
 import Sidebar, { Brand } from './Sidebar.jsx';
 import UserMenu from './UserMenu.jsx';
 
@@ -62,7 +63,7 @@ export default function AdminLayout() {
 
         {mode === 'dev' && (
           <div className="px-3 sm:px-6 lg:px-8 py-2 bg-lime/50 border-b border-lime text-xs sm:text-sm text-ink">
-            <strong className="font-semibold">Fejlesztői adatréteg:</strong> a megjelenített adatok ideiglenesek és kitalált, a Firebase még nincs beállítva (lásd: <code className="font-mono">.env.example</code>).
+            <strong className="font-semibold">Demó adatréteg:</strong> fiktív adatokkal működik, nem kapcsolódik Firebase-hez, a módosítások csak ebben a böngészőben tárolódnak.
           </div>
         )}
 
@@ -70,6 +71,7 @@ export default function AdminLayout() {
           <Outlet />
         </main>
       </div>
+      <AdminChat user={user} />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { CategorySelect, Counter, Field, ImageUpload, StoryImages, TextArea, TextInput } from './FormParts.jsx';
 import { FIELD_LIMITS } from '../config/content.js';
 import { FORMATS } from '../config/formats.js';
+import { categoryById } from '../../data/categories.js';
 
 const n = (s) => (s || '').length;
 const dateTimeLocal = (value) => {
@@ -15,7 +16,7 @@ const dateTimeLocal = (value) => {
 export default function ContentFormFields({ format, form, setForm, errors }) {
   const d = form.contentData;
   const set = (patch) => setForm((f) => ({ ...f, contentData: { ...f.contentData, ...patch } }));
-  const locked = FORMATS[format].fixedCategory;
+  const fixedCategory = FORMATS[format].fixedCategory;
   const title = (
     <Field label="Cím" required error={errors.title} counter={<Counter used={n(form.title)} max={FIELD_LIMITS.title} />}>
       {(a) => <TextInput {...a} value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} error={errors.title} />}
@@ -34,7 +35,13 @@ export default function ContentFormFields({ format, form, setForm, errors }) {
 
   return (
     <div className="grid gap-5">
-      <CategorySelect value={form.category} onChange={(v) => setForm((f) => ({ ...f, category: v }))} locked={Boolean(locked)} error={errors.category} />
+      {fixedCategory ? (
+        <p className="text-sm text-muted">
+          Kategória: <strong className="font-medium text-ink">{categoryById[fixedCategory].name}</strong> (a formátum alapján)
+        </p>
+      ) : (
+        <CategorySelect value={form.category} onChange={(v) => setForm((f) => ({ ...f, category: v }))} error={errors.category} />
+      )}
 
       {(format === 'short_article' || format === 'poll') && (
         <>
@@ -116,6 +123,26 @@ export default function ContentFormFields({ format, form, setForm, errors }) {
           </Field>
         </>
       )}
+      <Field
+        label="Címkék"
+        optional
+        hint="Soronként egy címkét adj meg. A címkékre kattintva az olvasók rákereshetnek."
+      >
+        {(a) => (
+          <TextArea
+            {...a}
+            rows={2}
+            value={
+              typeof d.tags === 'string'
+                ? d.tags
+                : Array.isArray(d.tags)
+                  ? d.tags.join('\n')
+                  : ''
+            }
+            onChange={(e) => set({ tags: e.target.value })}
+          />
+        )}
+      </Field>
     </div>
   );
 }

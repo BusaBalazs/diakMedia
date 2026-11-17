@@ -3,10 +3,11 @@ rules_version = '2';
 // NOT YET TESTED in the Firebase emulator: run rules tests before using real data.
 // Key guarantees:
 //  - non-public content is scoped to the user's school (users/{uid}.schoolId); published content is publicly readable
-//  - authors see/edit only their own content; editors and teachers can reassign drafts
+//  - authors see/edit only their own drafts; reviewers stage changes to published content privately
 //  - ONLY a teacher can set status 'published' (enforced here, not only in the UI)
-//  - editors/teachers can change only workflow fields of someone else's content, never the content itself
+//  - reviewers can change workflow fields; published content changes require an explicit commit
 //  - internal notes are never readable by authors
+//  - direct messages and conversation metadata are accessible only to their two participants
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -63,6 +64,11 @@ service cloud.firestore {
               && resource.data.status in ['submitted', 'editorial_review', 'withdrawn']
               && request.resource.data.status in ['editorial_review', 'changes_requested', 'awaiting_teacher', 'draft', 'withdrawn']
               && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'feedback', 'submittedAt', 'publishedAt']))
+            // Reviewers may commit explicitly approved changes to public copy.
+            || (isReviewer()
+              && resource.data.status == 'published'
+              && request.resource.data.status == 'published'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'category', 'contentData', 'cardData', 'updatedAt']))
             // Teacher: workflow control including the final publication approval.
             || (isTeacher()
               && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'feedback', 'publishedAt', 'submittedAt']))
@@ -76,10 +82,30 @@ service cloud.firestore {
             && get(/databases/$(database)/documents/users/$(request.resource.data.authorId)).data.role in ['editor', 'author']
             && get(/databases/$(database)/documents/users/$(request.resource.data.authorId)).data.displayName == request.resource.data.authorName)
         )
-        // Nobody but a teacher may produce a published document.
-        && (request.resource.data.status != 'published' || isTeacher());
+        // Only a teacher may transition content into the published state.
+        && (request.resource.data.status != 'published'
+          || isTeacher()
+          || (resource.data.status == 'published' && request.resource.data.status == resource.data.status && isReviewer()));
 
       allow delete: if false;
+    }
+
+    match /contentEdits/{contentId} {
+      function parentIsPublished() {
+        return exists(/databases/$(database)/documents/content/$(contentId))
+          && get(/databases/$(database)/documents/content/$(contentId)).data.status == 'published'
+          && inSchool(get(/databases/$(database)/documents/content/$(contentId)).data.schoolId);
+      }
+
+      allow read: if isReviewer() && parentIsPublished();
+      allow create, update: if isReviewer()
+        && parentIsPublished()
+        && request.resource.data.schoolId == get(/databases/$(database)/documents/content/$(contentId)).data.schoolId
+        && request.resource.data.contentId == contentId
+        && request.resource.data.keys().hasOnly(['schoolId', 'contentId', 'title', 'category', 'contentData', 'cardData', 'updatedAt']);
+      allow delete: if isReviewer()
+        && parentIsPublished()
+        && resource.data.schoolId == get(/databases/$(database)/documents/content/$(contentId)).data.schoolId;
     }
 
     match /pollVotes/{voteId} {
@@ -103,7 +129,18 @@ service cloud.firestore {
         && request.resource.data.option in pollDoc(request.resource.data.pollId).contentData.options
         && request.resource.data.createdAt == request.time;
 
-      allow update, delete: if false;
+      allow update: if signedIn()
+        && request.resource.data.keys().hasOnly(['pollId', 'option', 'createdAt'])
+        && request.resource.data.pollId == resource.data.pollId
+        && request.resource.data.option is string
+        && voteId == request.resource.data.pollId + '_' + request.auth.uid
+        && pollDoc(request.resource.data.pollId).status == 'published'
+        && pollDoc(request.resource.data.pollId).format == 'poll'
+        && pollDoc(request.resource.data.pollId).contentData.endsAt > request.time
+        && request.resource.data.option in pollDoc(request.resource.data.pollId).contentData.options
+        && request.resource.data.createdAt == request.time;
+
+      allow delete: if false;
     }
 
     // Internal editorial notes ('internal') are reviewer-only; change-request messages ('feedback') are also visible to the author.
@@ -112,6 +149,106 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/content/$(resource.data.contentId)).data.authorId == request.auth.uid));
       allow create: if inSchool(request.resource.data.schoolId) && isReviewer() && request.resource.data.authorId == request.auth.uid;
       allow update, delete: if false;
+    }
+
+    match /directChats/{chatId} {
+      function otherMember(memberIds) {
+        return memberIds[0] == request.auth.uid ? memberIds[1] : memberIds[0];
+      }
+
+      function validMembers(memberIds, schoolId) {
+        let otherUid = otherMember(memberIds);
+        let other = get(/databases/$(database)/documents/users/$(otherUid)).data;
+        return memberIds is list
+          && memberIds.size() == 2
+          && request.auth.uid in memberIds
+          && memberIds[0] != memberIds[1]
+          && other.schoolId == schoolId
+          && other.role in ['teacher', 'editor', 'author'];
+      }
+
+      function validLastMessage() {
+        let messagePath = /databases/$(database)/documents/directChats/$(chatId)/messages/$(request.resource.data.lastMessageId);
+        let message = getAfter(messagePath).data;
+        return request.resource.data.lastMessageId is string
+          && existsAfter(messagePath)
+          && message.chatId == chatId
+          && message.schoolId == request.resource.data.schoolId
+          && message.senderId == request.auth.uid
+          && message.recipientId == otherMember(request.resource.data.memberIds)
+          && message.text == request.resource.data.lastMessage
+          && message.createdAt == request.time;
+      }
+
+      function validChatSend() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'lastMessage', 'lastMessageAt', 'lastMessageId', 'lastSenderId', 'unreadFor'
+          ])
+          && validMembers(resource.data.memberIds, resource.data.schoolId)
+          && request.resource.data.lastMessage is string
+          && request.resource.data.lastMessage.size() > 0
+          && request.resource.data.lastMessage.size() <= 2000
+          && request.resource.data.lastMessageAt == request.time
+          && request.resource.data.lastSenderId == request.auth.uid
+          && request.resource.data.unreadFor == [otherMember(resource.data.memberIds)]
+          && validLastMessage();
+      }
+
+      allow read: if signedIn() && request.auth.uid in resource.data.memberIds;
+      allow create: if inSchool(request.resource.data.schoolId)
+        && role() in ['teacher', 'editor', 'author']
+        && request.resource.data.keys().hasOnly([
+          'schoolId', 'memberIds', 'lastMessage', 'lastMessageAt', 'lastMessageId', 'lastSenderId', 'unreadFor'
+        ])
+        && validMembers(request.resource.data.memberIds, request.resource.data.schoolId)
+        && request.resource.data.lastMessage is string
+        && request.resource.data.lastMessage.size() > 0
+        && request.resource.data.lastMessage.size() <= 2000
+        && request.resource.data.lastMessageAt == request.time
+        && request.resource.data.lastSenderId == request.auth.uid
+        && request.resource.data.unreadFor == [otherMember(request.resource.data.memberIds)]
+        && validLastMessage();
+      allow update: if signedIn()
+        && inSchool(resource.data.schoolId)
+        && request.auth.uid in resource.data.memberIds
+        && request.resource.data.schoolId == resource.data.schoolId
+        && request.resource.data.memberIds == resource.data.memberIds
+        && (
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['unreadFor'])
+            && resource.data.unreadFor == [request.auth.uid]
+            && request.resource.data.unreadFor == [])
+          || validChatSend()
+        );
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        function chatAfter() {
+          return getAfter(/databases/$(database)/documents/directChats/$(chatId)).data;
+        }
+
+        allow read: if signedIn()
+          && request.auth.uid in get(/databases/$(database)/documents/directChats/$(chatId)).data.memberIds;
+        allow create: if signedIn()
+          && role() in ['teacher', 'editor', 'author']
+          && existsAfter(/databases/$(database)/documents/directChats/$(chatId))
+          && request.resource.data.keys().hasOnly([
+            'chatId', 'schoolId', 'senderId', 'senderName', 'recipientId', 'recipientName', 'text', 'createdAt'
+          ])
+          && request.resource.data.chatId == chatId
+          && request.resource.data.schoolId == schoolOf()
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.senderName == profile().displayName
+          && request.resource.data.recipientId == otherMember(chatAfter().memberIds)
+          && request.resource.data.recipientName == get(/databases/$(database)/documents/users/$(request.resource.data.recipientId)).data.displayName
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 2000
+          && request.resource.data.createdAt == request.time
+          && chatAfter().schoolId == request.resource.data.schoolId
+          && request.auth.uid in chatAfter().memberIds
+          && request.resource.data.recipientId in chatAfter().memberIds;
+        allow update, delete: if false;
+      }
     }
 
     // Topic ideas can be submitted by any school member and managed by editors and teachers.

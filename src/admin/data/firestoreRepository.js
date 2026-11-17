@@ -1,14 +1,16 @@
 // Firestore implementation of the repository API (see data/repository.js and devRepository.js for the full contract).
-// Collections: schools, users, content, editorialNotes, topics, suggestions, settings, pollVotes.
+// Collections: schools, users, content, contentEdits, editorialNotes, directChats/messages, topics, suggestions, settings, pollVotes.
 // NOTE: not exercised against a live Firebase project yet. The business rules (assertAllowed, validation) run here too,
 // but the authoritative enforcement is firestore.rules / storage.rules.
 import {
-  addDoc, collection, deleteDoc, doc, getCountFromServer, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch,
+  addDoc, arrayRemove, collection, deleteDoc, doc, getCountFromServer, getDoc, getDocs, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch,
 } from 'firebase/firestore';
 import { getFirebase, getStorageInstance } from '../firebase/client.js';
 import { assertAllowed, canEditContent } from '../config/transitions.js';
-import { deriveTitle, emptyContentData, validatePublication } from '../config/content.js';
+import { deriveTitle, emptyContentData, syncCardImage, validatePublication } from '../config/content.js';
+import { FORMATS } from '../config/formats.js';
 import { toDate } from '../lib/date.js';
+import { directChatId } from './directChat.js';
 
 const withId = (snap) => ({ id: snap.id, ...snap.data() });
 const ms = (v, f) => toDate(v?.[f])?.getTime() || 0;
@@ -16,12 +18,72 @@ const byUpdatedDesc = (a, b) => ms(b, 'updatedAt') - ms(a, 'updatedAt');
 const byCreatedDesc = (a, b) => ms(b, 'createdAt') - ms(a, 'createdAt');
 const col = async (name) => { const { db } = await getFirebase(); return { db, c: collection(db, name) }; };
 const ref = async (name, id) => { const { db } = await getFirebase(); return { db, r: doc(db, name, id) }; };
+async function withPendingChanges(content, role) {
+  if (!content || content.status !== 'published' || !['editor', 'teacher'].includes(role)) return content;
+  const { r } = await ref('contentEdits', content.id);
+  const snapshot = await getDoc(r);
+  if (!snapshot.exists()) return content;
+  const pending = snapshot.data();
+  return {
+    ...content,
+    title: pending.title ?? content.title,
+    category: pending.category ?? content.category,
+    contentData: pending.contentData ?? content.contentData,
+    cardData: pending.cardData ?? content.cardData,
+    updatedAt: pending.updatedAt ?? content.updatedAt,
+    hasPendingChanges: true,
+  };
+}
 
 export const firestoreRepository = {
   mode: 'firebase',
 
   async getSchool(schoolId) { const { r } = await ref('schools', schoolId); const s = await getDoc(r); return s.exists() ? withId(s) : null; },
   async listMembers({ schoolId }) { const { c } = await col('users'); return (await getDocs(query(c, where('schoolId', '==', schoolId)))).docs.map((d) => ({ uid: d.id, ...d.data() })); },
+  async subscribeDirectChats({ user, onData, onError }) {
+    const { db } = await getFirebase();
+    const { onSnapshot } = await import('firebase/firestore');
+    const chats = collection(db, 'directChats');
+    return onSnapshot(query(chats, where('memberIds', 'array-contains', user.uid)), (snapshot) => {
+      onData(snapshot.docs.map(withId).sort((a, b) => ms(b, 'lastMessageAt') - ms(a, 'lastMessageAt')));
+    }, onError);
+  },
+  async subscribeDirectMessages(chatId, { onData, onError }) {
+    const { db } = await getFirebase();
+    const { onSnapshot, orderBy } = await import('firebase/firestore');
+    const messages = collection(db, 'directChats', chatId, 'messages');
+    return onSnapshot(query(messages, orderBy('createdAt', 'asc')), (snapshot) => onData(snapshot.docs.map(withId)), onError);
+  },
+  async sendDirectMessage(chatId, recipientUid, text, { user }) {
+    const messageText = text.trim();
+    if (!messageText || messageText.length > 2000 || recipientUid === user.uid || chatId !== directChatId(user.uid, recipientUid)) {
+      throw new Error('Az üzenet vagy a címzett nem érvényes.');
+    }
+    const { db } = await getFirebase();
+    const recipientRef = doc(db, 'users', recipientUid);
+    const chatRef = doc(db, 'directChats', chatId);
+    const messageRef = doc(collection(db, 'directChats', chatId, 'messages'));
+    const recipientSnapshot = await getDoc(recipientRef);
+    if (!recipientSnapshot.exists()
+        || recipientSnapshot.data().schoolId !== user.schoolId
+        || !['teacher', 'editor', 'author'].includes(recipientSnapshot.data().role)) {
+      throw new Error('A címzett nem található a szerkesztőségedben.');
+    }
+    const batch = writeBatch(db);
+    batch.set(chatRef, {
+      schoolId: user.schoolId, memberIds: [user.uid, recipientUid].sort(), lastMessage: messageText,
+      lastMessageAt: serverTimestamp(), lastMessageId: messageRef.id, lastSenderId: user.uid, unreadFor: [recipientUid],
+    }, { merge: true });
+    batch.set(messageRef, {
+      chatId, schoolId: user.schoolId, senderId: user.uid, senderName: user.displayName,
+      recipientId: recipientUid, recipientName: recipientSnapshot.data().displayName, text: messageText, createdAt: serverTimestamp(),
+    });
+    await batch.commit();
+  },
+  async markDirectChatRead(chatId, { user }) {
+    const { db } = await getFirebase();
+    await updateDoc(doc(db, 'directChats', chatId), { unreadFor: arrayRemove(user.uid) });
+  },
 
   // ---- content ----
   // Query constraints match the security rules (otherwise Firestore rejects the whole query).
@@ -29,7 +91,11 @@ export const firestoreRepository = {
     const { c } = await col('content');
     const cs = [where('schoolId', '==', schoolId)];
     if (role === 'author') cs.push(where('authorId', '==', uid));
-    return (await getDocs(query(c, ...cs))).docs.map(withId).sort(byUpdatedDesc);
+    const contents = (await getDocs(query(c, ...cs))).docs.map(withId);
+    const withEdits = ['editor', 'teacher'].includes(role)
+      ? await Promise.all(contents.map((content) => withPendingChanges(content, role)))
+      : contents;
+    return withEdits.sort(byUpdatedDesc);
   },
   async reassignDraft(id, memberUid, { user }) {
     if (!['editor', 'teacher'].includes(user.role)) throw new Error('Piszkozatot csak szerkesztő vagy tanár ruházhat át.');
@@ -76,22 +142,44 @@ export const firestoreRepository = {
     const content = withId(snapshot);
     return content.status === 'published' ? content : null;
   },
-  async getContent(id) { const { r } = await ref('content', id); const s = await getDoc(r); return s.exists() ? withId(s) : null; },
+  async getContent(id, ctx = {}) {
+    const { r } = await ref('content', id);
+    const snapshot = await getDoc(r);
+    return snapshot.exists() ? withPendingChanges(withId(snapshot), ctx.role) : null;
+  },
   async saveContent(input, { user }) {
     const { db, c } = await col('content');
     const title = deriveTitle(input.format, input.title, input.contentData);
+    const category = FORMATS[input.format]?.fixedCategory || input.category;
     if (input.id) {
       const r = doc(db, 'content', input.id);
       const cur = await getDoc(r);
       if (!cur.exists() || !canEditContent(user, { id: cur.id, ...cur.data() })) throw new Error('Ezt a tartalmat most nem szerkesztheted.');
-      const patch = { title, category: input.category, contentData: input.contentData, updatedAt: serverTimestamp() };
-      if (input.cardData) patch.cardData = input.cardData;
+      if (cur.data().status === 'published') {
+        const editRef = doc(db, 'contentEdits', input.id);
+        const editSnapshot = await getDoc(editRef);
+        const pending = editSnapshot.exists() ? editSnapshot.data() : {};
+        const cardData = pending.cardData ?? cur.data().cardData;
+        await setDoc(editRef, {
+          schoolId: cur.data().schoolId,
+          contentId: input.id,
+          title,
+          category,
+          contentData: input.contentData,
+          cardData: cardData ? syncCardImage(cardData, input.format, input.contentData) : cardData,
+          updatedAt: serverTimestamp(),
+        });
+        return withPendingChanges(withId(await getDoc(r)), user.role);
+      }
+      const patch = { title, category, contentData: input.contentData, updatedAt: serverTimestamp() };
+      const cardData = input.cardData ?? cur.data().cardData;
+      if (cardData) patch.cardData = syncCardImage(cardData, input.format, input.contentData);
       if (input.topicId) patch.topicId = input.topicId;
       await updateDoc(r, patch);
       return withId(await getDoc(r));
     }
     const data = {
-      schoolId: user.schoolId, authorId: user.uid, authorName: user.displayName, title, format: input.format, category: input.category,
+      schoolId: user.schoolId, authorId: user.uid, authorName: user.displayName, title, format: input.format, category,
       status: 'draft', contentData: input.contentData, cardData: null, topicId: input.topicId || null,
       createdAt: serverTimestamp(), updatedAt: serverTimestamp(), submittedAt: null, publishedAt: null,
     };
@@ -103,8 +191,58 @@ export const firestoreRepository = {
     const { r } = await ref('content', id);
     const cur = await getDoc(r);
     if (!cur.exists() || !canEditContent(user, { id, ...cur.data() })) throw new Error('A kártyát most nem szerkesztheted.');
+    if (cur.data().status === 'published') {
+      const { db } = await getFirebase();
+      const editRef = doc(db, 'contentEdits', id);
+      const editSnapshot = await getDoc(editRef);
+      const pending = editSnapshot.exists() ? editSnapshot.data() : {};
+      const contentData = pending.contentData ?? cur.data().contentData;
+      await setDoc(editRef, {
+        schoolId: cur.data().schoolId,
+        contentId: id,
+        title: pending.title ?? cur.data().title,
+        category: pending.category ?? cur.data().category,
+        contentData,
+        cardData: syncCardImage(cardData, cur.data().format, contentData),
+        updatedAt: serverTimestamp(),
+      });
+      return withPendingChanges(withId(cur), user.role);
+    }
     await updateDoc(r, { cardData, updatedAt: serverTimestamp() });
     return withId(await getDoc(r));
+  },
+  async savePublishedChanges(id, cardData, { user }) {
+    const { db } = await getFirebase();
+    const contentRef = doc(db, 'content', id);
+    const editRef = doc(db, 'contentEdits', id);
+    const [contentSnapshot, editSnapshot] = await Promise.all([getDoc(contentRef), getDoc(editRef)]);
+    if (!contentSnapshot.exists() || !canEditContent(user, { id, ...contentSnapshot.data() }))
+      throw new Error('Ezt a közzétett tartalmat most nem módosíthatod.');
+    const current = withId(contentSnapshot);
+    if (current.status !== 'published') throw new Error('Ez a tartalom már nem nyilvános.');
+    const pending = editSnapshot.exists() ? editSnapshot.data() : {};
+    const contentData = pending.contentData ?? current.contentData;
+    const updated = {
+      ...current,
+      title: pending.title ?? current.title,
+      category: pending.category ?? current.category,
+      contentData,
+      cardData: syncCardImage(cardData, current.format, contentData),
+    };
+    const settings = await this.getSettings(user.schoolId);
+    if (!validatePublication(updated, settings.limits).ok)
+      throw new Error('A tartalom vagy a kártya hiányos, ezért nem menthető nyilvánosan.');
+    const batch = writeBatch(db);
+    batch.update(contentRef, {
+      title: updated.title,
+      category: updated.category,
+      contentData: updated.contentData,
+      cardData: updated.cardData,
+      updatedAt: serverTimestamp(),
+    });
+    if (editSnapshot.exists()) batch.delete(editRef);
+    await batch.commit();
+    return withId(await getDoc(contentRef));
   },
   async submitContent(id, { user }) {
     const { r } = await ref('content', id);
